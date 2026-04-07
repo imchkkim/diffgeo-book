@@ -228,9 +228,9 @@ function Ch10Viz() {
     <div class="viz-inner">
       <canvas ref={canvasRef} />
       <div class="viz-controls">
-        <Slider label="\u03B1" min={-1} max={1} step={0.01} value={alpha} onChange={setAlpha} />
+        <Slider label="α" min={-1} max={1} step={0.01} value={alpha} onChange={setAlpha} />
         <span style={{ color: 'var(--fg-muted)', fontSize: '0.85em' }}>
-          \u03B1 = \u22121: m-접속 | \u03B1 = 0: 레비-치비타 | \u03B1 = +1: e-접속
+          α = −1: m-접속 | α = 0: 레비-치비타 | α = +1: e-접속
         </span>
       </div>
     </div>

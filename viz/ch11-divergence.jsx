@@ -245,10 +245,10 @@ function Ch11Viz() {
     <div class="viz-inner">
       <canvas ref={canvasRef} />
       <div class="viz-controls">
-        <Slider label="P\u2081" min={0.05} max={0.9} step={0.01} value={p1} onChange={setP1} />
-        <Slider label="P\u2082" min={0.05} max={0.9} step={0.01} value={p2} onChange={setP2} />
-        <Slider label="Q\u2081" min={0.05} max={0.9} step={0.01} value={q1} onChange={setQ1} />
-        <Slider label="Q\u2082" min={0.05} max={0.9} step={0.01} value={q2} onChange={setQ2} />
+        <Slider label="P₁" min={0.05} max={0.9} step={0.01} value={p1} onChange={setP1} />
+        <Slider label="P₂" min={0.05} max={0.9} step={0.01} value={p2} onChange={setP2} />
+        <Slider label="Q₁" min={0.05} max={0.9} step={0.01} value={q1} onChange={setQ1} />
+        <Slider label="Q₂" min={0.05} max={0.9} step={0.01} value={q2} onChange={setQ2} />
       </div>
     </div>
   );

@@ -22,8 +22,14 @@ function Ch08Viz() {
 
   const drawRef = useRef(null);
   drawRef.current = (ctx, w, h) => {
-    const cx = w / 2, cy = h / 2;
-    const S = Math.min(w, h) * 0.35;
+    const cx = w / 2, cy = h * 0.38;
+    const S = Math.min(w, h) * 0.28;
+
+    const COL_BLUE = colors.accent;
+    const COL_ORANGE = '#FF9800';
+    const COL_GREEN = '#43A047';
+    const COL_RED = '#e53935';
+    const COL_PURPLE = '#7B1FA2';
 
     // Draw surface wireframe
     const steps = 30;
@@ -98,62 +104,142 @@ function Ch08Viz() {
     }
     ctx.globalAlpha = 1;
 
-    // Draw a triangle on the surface and compute its angle sum
+    // Draw a triangle on the surface
     const triU = [0.6, 1.2, 0.9];
     const triV = [2.5, 2.2, 3.5];
     const triPts = triU.map((u, i) => proj(surfacePoint(u, triV[i])));
 
-    ctx.strokeStyle = '#e53935';
+    ctx.strokeStyle = COL_PURPLE;
     ctx.lineWidth = 2.5;
     ctx.beginPath();
     ctx.moveTo(triPts[0].x, triPts[0].y);
     triPts.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
     ctx.closePath();
     ctx.stroke();
-    ctx.fillStyle = 'rgba(233,30,99,0.15)';
+    ctx.fillStyle = 'rgba(123,31,162,0.12)';
     ctx.fill();
 
-    // Gaussian curvature info
-    let K, angleSum, kText;
+    // Surface-specific curvature values
+    let k1, k2, K, k1Str, k2Str, triArea, insight;
     switch (surface) {
-      case 'sphere': K = 1; angleSum = '> 180°'; kText = 'K = 1/r² > 0'; break;
-      case 'cylinder': K = 0; angleSum = '= 180°'; kText = 'K = 0 (κ₁ × 0)'; break;
-      case 'saddle': K = -1; angleSum = '< 180°'; kText = 'K < 0'; break;
-      case 'plane': K = 0; angleSum = '= 180°'; kText = 'K = 0'; break;
+      case 'sphere':
+        k1 = 1; k2 = 1; K = 1;
+        k1Str = '1.00'; k2Str = '1.00'; triArea = 0.15;
+        insight = '\uAD6C\uBA74\uC740 \uD3C9\uBA74\uC73C\uB85C \uD3BC\uCE60 \uC218 \uC5C6\uB2E4 (K \u2260 0)';
+        break;
+      case 'cylinder':
+        k1 = 1; k2 = 0; K = 0;
+        k1Str = '1.00'; k2Str = '0.00'; triArea = 0.15;
+        insight = '\uC6D0\uD1B5 = \uC885\uC774\uB97C \uB9D0\uC740 \uAC83 \u2192 \uB0B4\uC7AC\uC801\uC73C\uB85C \uD3C9\uD3C9';
+        break;
+      case 'saddle':
+        k1 = 0.8; k2 = -0.8; K = -0.64;
+        k1Str = '0.80'; k2Str = '\u22120.80'; triArea = 0.15;
+        insight = '\uC548\uC7A5\uBA74: \uB450 \uBC29\uD5A5\uC73C\uB85C \uBC18\uB300\uB85C \uD718\uC5B4\uC9C4\uB2E4';
+        break;
+      case 'plane':
+        k1 = 0; k2 = 0; K = 0;
+        k1Str = '0.00'; k2Str = '0.00'; triArea = 0.15;
+        insight = '\uD3C9\uBA74: \uBAA8\uB4E0 \uACE1\uB960\uC774 0';
+        break;
     }
 
+    const angleSumDeg = 180 + K * triArea * (180 / Math.PI);
+
+    // --- Formula panel ---
+    const panelY = h * 0.68;
+    const panelX = 14;
+    const lineH = 20;
+
+    // Line 1: K = k1 x k2 (color coded)
+    ctx.font = 'bold 15px monospace';
+    let xOff = panelX;
+
+    const COL_K = K > 0 ? COL_GREEN : K < 0 ? COL_RED : colors.fgMuted;
+    ctx.fillStyle = COL_K;
+    ctx.fillText('K', xOff, panelY);
+    xOff += ctx.measureText('K').width;
     ctx.fillStyle = colors.fg;
-    ctx.font = 'bold 16px sans-serif';
-    ctx.fillText(`가우스 곡률: ${kText}`, 12, 26);
+    ctx.fillText(' = ', xOff, panelY);
+    xOff += ctx.measureText(' = ').width;
+    ctx.fillStyle = COL_BLUE;
+    ctx.fillText('\u03BA\u2081', xOff, panelY);
+    xOff += ctx.measureText('\u03BA\u2081').width;
+    ctx.fillStyle = colors.fg;
+    ctx.fillText(' \u00D7 ', xOff, panelY);
+    xOff += ctx.measureText(' \u00D7 ').width;
+    ctx.fillStyle = COL_ORANGE;
+    ctx.fillText('\u03BA\u2082', xOff, panelY);
+    xOff += ctx.measureText('\u03BA\u2082').width;
+    ctx.fillStyle = colors.fg;
+    ctx.fillText(' = ', xOff, panelY);
+    xOff += ctx.measureText(' = ').width;
+    ctx.fillStyle = COL_BLUE;
+    ctx.fillText(k1Str, xOff, panelY);
+    xOff += ctx.measureText(k1Str).width;
+    ctx.fillStyle = colors.fg;
+    ctx.fillText(' \u00D7 ', xOff, panelY);
+    xOff += ctx.measureText(' \u00D7 ').width;
+    ctx.fillStyle = COL_ORANGE;
+    ctx.fillText(k2Str, xOff, panelY);
+    xOff += ctx.measureText(k2Str).width;
+    ctx.fillStyle = colors.fg;
+    ctx.fillText(' = ', xOff, panelY);
+    xOff += ctx.measureText(' = ').width;
+    ctx.fillStyle = COL_K;
+    ctx.fillText(K.toFixed(2), xOff, panelY);
 
-    ctx.font = '14px sans-serif';
+    // Line 2: angle sum formula
+    const y2 = panelY + lineH + 4;
+    ctx.font = '14px monospace';
+    xOff = panelX;
+    ctx.fillStyle = COL_PURPLE;
+    ctx.fillText('\u2211\u03B1', xOff, y2);
+    xOff += ctx.measureText('\u2211\u03B1').width;
+    ctx.fillStyle = colors.fg;
+    ctx.fillText(' = 180\u00B0 + ', xOff, y2);
+    xOff += ctx.measureText(' = 180\u00B0 + ').width;
+    ctx.fillStyle = COL_K;
+    ctx.fillText('K', xOff, y2);
+    xOff += ctx.measureText('K').width;
+    ctx.fillStyle = colors.fg;
+    ctx.fillText('\u00D7Area = ', xOff, y2);
+    xOff += ctx.measureText('\u00D7Area = ').width;
+    ctx.fillStyle = COL_PURPLE;
+    ctx.fillText(angleSumDeg.toFixed(1) + '\u00B0', xOff, y2);
+
+    // Line 3: extrinsic vs intrinsic
+    const y3 = y2 + lineH + 2;
+    ctx.font = '13px monospace';
+    ctx.fillStyle = COL_BLUE;
+    ctx.fillText('\u03BA\u2081', panelX, y3);
     ctx.fillStyle = colors.fgMuted;
-    ctx.fillText(`삼각형 내각의 합 ${angleSum}`, 12, 50);
-
-    if (surface === 'cylinder') {
-      ctx.fillText('원통 = 종이를 말은 것 → 내재적으로 평평', 12, 72);
-    } else if (surface === 'sphere') {
-      ctx.fillText('구면은 평면으로 펼칠 수 없다 (K ≠ 0)', 12, 72);
-    } else if (surface === 'saddle') {
-      ctx.fillText('안장면: κ₁ > 0, κ₂ < 0 → K < 0', 12, 72);
-    }
-
-    // κ₁, κ₂ visualization at bottom
+    ctx.fillText(',', panelX + ctx.measureText('\u03BA\u2081').width, y3);
+    let x3 = panelX + ctx.measureText('\u03BA\u2081,').width;
+    ctx.fillStyle = COL_ORANGE;
+    ctx.fillText('\u03BA\u2082', x3, y3);
+    x3 += ctx.measureText('\u03BA\u2082').width;
     ctx.fillStyle = colors.fgMuted;
-    ctx.font = '12px sans-serif';
-    switch (surface) {
-      case 'sphere': ctx.fillText('κ₁ = 1/r, κ₂ = 1/r → K = κ₁κ₂ = 1/r²', 12, h - 12); break;
-      case 'cylinder': ctx.fillText('κ₁ = 1/r, κ₂ = 0 → K = κ₁κ₂ = 0 (Theorema Egregium!)', 12, h - 12); break;
-      case 'saddle': ctx.fillText('κ₁ > 0, κ₂ < 0 → K = κ₁κ₂ < 0', 12, h - 12); break;
-      case 'plane': ctx.fillText('κ₁ = 0, κ₂ = 0 → K = 0', 12, h - 12); break;
-    }
+    ctx.fillText(' = \uC678\uC7AC\uC801(extrinsic)    ', x3, y3);
+    x3 += ctx.measureText(' = \uC678\uC7AC\uC801(extrinsic)    ').width;
+    ctx.fillStyle = COL_K;
+    ctx.fillText('K', x3, y3);
+    x3 += ctx.measureText('K').width;
+    ctx.fillStyle = colors.fgMuted;
+    ctx.fillText(' = \uB0B4\uC7AC\uC801(intrinsic)', x3, y3);
+
+    // Line 4: insight
+    const y4 = y3 + lineH;
+    ctx.font = '13px sans-serif';
+    ctx.fillStyle = colors.fgMuted;
+    ctx.fillText(insight, panelX, y4);
 
     // Hint text
     ctx.fillStyle = colors.fgMuted;
     ctx.font = '11px sans-serif';
     ctx.globalAlpha = 0.5;
     ctx.textAlign = 'right';
-    ctx.fillText('드래그하여 회전', w - 12, h - 12);
+    ctx.fillText('\uB4DC\uB798\uADF8\uD558\uC5EC \uD68C\uC804', w - 12, h - 12);
     ctx.textAlign = 'left';
     ctx.globalAlpha = 1;
   };
