@@ -1,6 +1,6 @@
 import { h, render } from 'preact';
 import { useState, useRef } from 'preact/hooks';
-import { useCanvas } from './shared/canvas-utils.jsx';
+import { useCanvas, usePointer } from './shared/canvas-utils.jsx';
 import { Select } from './shared/controls.jsx';
 import { useThemeColors } from './shared/theme.jsx';
 
@@ -16,6 +16,9 @@ const SURFACES = [
 function Ch08Viz() {
   const colors = useThemeColors();
   const [surface, setSurface] = useState('sphere');
+
+  const rot = useRef({ y: -0.5, x: 0.3 });
+  const dragRef = useRef(null);
 
   const drawRef = useRef(null);
   drawRef.current = (ctx, w, h) => {
@@ -58,7 +61,7 @@ function Ch08Viz() {
 
     function proj(p) {
       const [x, y, z] = p;
-      const rotY = -0.5, rotX = 0.3;
+      const rotY = rot.current.y, rotX = rot.current.x;
       const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
       let rx = x * cosY + z * sinY, rz = -x * sinY + z * cosY;
       const cosX = Math.cos(rotX), sinX = Math.sin(rotX);
@@ -144,9 +147,32 @@ function Ch08Viz() {
       case 'saddle': ctx.fillText('κ₁ > 0, κ₂ < 0 → K = κ₁κ₂ < 0', 12, h - 12); break;
       case 'plane': ctx.fillText('κ₁ = 0, κ₂ = 0 → K = 0', 12, h - 12); break;
     }
+
+    // Hint text
+    ctx.fillStyle = colors.fgMuted;
+    ctx.font = '11px sans-serif';
+    ctx.globalAlpha = 0.5;
+    ctx.textAlign = 'right';
+    ctx.fillText('드래그하여 회전', w - 12, h - 12);
+    ctx.textAlign = 'left';
+    ctx.globalAlpha = 1;
   };
 
   const canvasRef = useCanvas(drawRef);
+
+  usePointer(canvasRef, {
+    onDown: (pos) => {
+      dragRef.current = { mx: pos.x, my: pos.y, ry: rot.current.y, rx: rot.current.x };
+    },
+    onDrag: (pos) => {
+      if (!dragRef.current) return;
+      rot.current = {
+        y: dragRef.current.ry + (pos.x - dragRef.current.mx) * 0.01,
+        x: dragRef.current.rx - (pos.y - dragRef.current.my) * 0.01,
+      };
+    },
+    onUp: () => { dragRef.current = null; },
+  });
 
   return (
     <div class="viz-inner">

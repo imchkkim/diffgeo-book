@@ -89,19 +89,51 @@ function Ch05Viz() {
     return () => cancelAnimationFrame(animRef.current);
   }, [playing]);
 
+  // Compute spherical excess (area of spherical triangle on unit sphere)
+  function computeSphericalArea(vA, vB, vC) {
+    // Spherical excess = A + B + C - pi
+    // Use the formula: tan(E/4) = sqrt(tan(s/2)*tan((s-a)/2)*tan((s-b)/2)*tan((s-c)/2))
+    // where a,b,c are arc lengths and s is half-perimeter
+    const a = Math.acos(Math.max(-1, Math.min(1, vecDot(vB, vC))));
+    const b = Math.acos(Math.max(-1, Math.min(1, vecDot(vA, vC))));
+    const c = Math.acos(Math.max(-1, Math.min(1, vecDot(vA, vB))));
+    const s = (a + b + c) / 2;
+    const tanE4 = Math.sqrt(
+      Math.max(0, Math.tan(s / 2) * Math.tan((s - a) / 2) * Math.tan((s - b) / 2) * Math.tan((s - c) / 2))
+    );
+    return 4 * Math.atan(tanE4);
+  }
+
   const drawRef = useRef(null);
   drawRef.current = (ctx, w, h) => {
     const cx = w / 2;
-    const cy = h / 2;
-    const R = Math.min(w, h) * 0.35;
+    const cy = h * 0.42;
+    const R = Math.min(w, h) * 0.30;
     const rotY = rot.current.y, rotX = rot.current.x;
+
+    const COL_BLUE = colors.accent;
+    const COL_RED = '#e53935';
 
     // Sphere wireframe
     drawSphereWireframe(ctx, cx, cy, R, rotY, rotX, colors.fgMuted);
 
-    // Triangle edges (great circle arcs)
+    // Triangle fill (blue, semi-transparent)
     const verts = [A, B, C];
-    ctx.strokeStyle = colors.accent;
+    ctx.fillStyle = 'rgba(33,150,243,0.18)';
+    ctx.beginPath();
+    for (let e = 0; e < 3; e++) {
+      const v0 = verts[e], v1 = verts[(e + 1) % 3];
+      for (let i = 0; i <= 40; i++) {
+        const p = vecNormalize(slerp(v0, v1, i / 40));
+        const pp = project3D(vecScale(p, R), cx, cy, 1, rotY, rotX);
+        if (e === 0 && i === 0) ctx.moveTo(pp.x, pp.y); else ctx.lineTo(pp.x, pp.y);
+      }
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // Triangle edges (great circle arcs)
+    ctx.strokeStyle = COL_BLUE;
     ctx.lineWidth = 2;
     for (let e = 0; e < 3; e++) {
       const v0 = verts[e], v1 = verts[(e + 1) % 3];
@@ -117,7 +149,7 @@ function Ch05Viz() {
     // Vertices
     for (const v of verts) {
       const pp = project3D(vecScale(v, R), cx, cy, 1, rotY, rotX);
-      ctx.fillStyle = colors.accent;
+      ctx.fillStyle = COL_BLUE;
       ctx.beginPath();
       ctx.arc(pp.x, pp.y, 4, 0, TAU);
       ctx.fill();
@@ -139,12 +171,12 @@ function Ch05Viz() {
     // Draw transported vector
     const tip = vecAdd(vecScale(pos, R), vecScale(vec, R));
     const tScreen = project3D(tip, cx, cy, 1, rotY, rotX);
-    ctx.strokeStyle = '#e53935';
+    ctx.strokeStyle = COL_RED;
     ctx.lineWidth = 2.5;
     drawArrow(ctx, pScreen.x, pScreen.y, tScreen.x, tScreen.y, 10);
 
     // Draw position dot
-    ctx.fillStyle = '#e53935';
+    ctx.fillStyle = COL_RED;
     ctx.beginPath();
     ctx.arc(pScreen.x, pScreen.y, 5, 0, TAU);
     ctx.fill();
@@ -164,24 +196,91 @@ function Ch05Viz() {
       ctx.setLineDash([]);
     }
 
-    // Holonomy angle info
+    // --- Formula panel (always visible, updates in real-time) ---
+    const area = computeSphericalArea(A, B, C);
+
+    // Compute current holonomy angle
+    let initVec = vecSub(B, vecScale(A, vecDot(A, B)));
+    const initLen = Math.sqrt(vecDot(initVec, initVec));
+    if (initLen > 1e-10) initVec = vecScale(initVec, 0.3 / initLen);
+    const dotP = vecDot(vecNormalize(initVec), vecNormalize(vec));
+    const holAngle = Math.acos(Math.max(-1, Math.min(1, dotP)));
+    const holDeg = holAngle * 180 / Math.PI;
+
+    const panelY = h * 0.76;
+    const panelX = 14;
+    const lineH = 20;
+
+    // Title
+    ctx.font = 'bold 14px monospace';
+    ctx.fillStyle = colors.fg;
+    ctx.fillText('홀로노미 정리:  \u0394\u03B8 = \u222C K dA', panelX, panelY);
+
+    // Formula line with color coding
+    const y1 = panelY + lineH + 4;
+    ctx.font = '14px monospace';
+    let xOff = panelX;
+
+    // "Δθ" in red
+    ctx.fillStyle = COL_RED;
+    ctx.fillText('\u0394\u03B8', xOff, y1);
+    xOff += ctx.measureText('\u0394\u03B8').width;
+
+    ctx.fillStyle = colors.fg;
+    ctx.fillText(' = K \u00D7 ', xOff, y1);
+    xOff += ctx.measureText(' = K \u00D7 ').width;
+
+    // "Area" in blue
+    ctx.fillStyle = COL_BLUE;
+    ctx.fillText('Area(\u03A9)', xOff, y1);
+    xOff += ctx.measureText('Area(\u03A9)').width;
+
+    // Second line: numerical values
+    const y2 = y1 + lineH;
+    xOff = panelX + 16;
+    ctx.font = '14px monospace';
+
+    ctx.fillStyle = colors.fg;
+    ctx.fillText('= 1 \u00D7 ', xOff, y2);
+    xOff += ctx.measureText('= 1 \u00D7 ').width;
+
+    ctx.fillStyle = COL_BLUE;
+    const areaStr = area.toFixed(3);
+    ctx.fillText(areaStr, xOff, y2);
+    xOff += ctx.measureText(areaStr).width;
+
+    ctx.fillStyle = colors.fg;
+    ctx.fillText(' = ', xOff, y2);
+    xOff += ctx.measureText(' = ').width;
+
+    ctx.fillStyle = COL_RED;
+    const radStr = (progress >= 2.99 ? holAngle : area).toFixed(3) + ' rad';
+    ctx.fillText(radStr, xOff, y2);
+    xOff += ctx.measureText(radStr).width;
+
+    ctx.fillStyle = colors.fg;
+    ctx.fillText(' = ', xOff, y2);
+    xOff += ctx.measureText(' = ').width;
+
+    ctx.fillStyle = COL_RED;
+    const degStr = (progress >= 2.99 ? holDeg : (area * 180 / Math.PI)).toFixed(1) + '\u00B0';
+    ctx.fillText(degStr, xOff, y2);
+
+    // Measured vs predicted
     if (progress >= 2.99) {
-      // Calculate holonomy angle
-      let initVec = vecSub(B, vecScale(A, vecDot(A, B)));
-      const initLen = Math.sqrt(vecDot(initVec, initVec));
-      if (initLen > 1e-10) initVec = vecScale(initVec, 0.3 / initLen);
-
-      const finalVec = vec;
-      const dotP = vecDot(vecNormalize(initVec), vecNormalize(finalVec));
-      const holAngle = Math.acos(Math.max(-1, Math.min(1, dotP)));
-      const degrees = (holAngle * 180 / Math.PI).toFixed(1);
-
-      ctx.fillStyle = '#e53935';
-      ctx.font = 'bold 16px sans-serif';
-      ctx.fillText(`홀로노미: ${degrees}°`, 12, 28);
-      ctx.font = '13px sans-serif';
+      const y3 = y2 + lineH;
+      ctx.font = '13px monospace';
       ctx.fillStyle = colors.fgMuted;
-      ctx.fillText(`(구면 삼각형의 넓이 = ${(holAngle).toFixed(3)} rad)`, 12, 48);
+      ctx.fillText(`\u2192 \uCE21\uC815\uB41C `, panelX, y3);
+      const mxOff = panelX + ctx.measureText('\u2192 \uCE21\uC815\uB41C ').width;
+      ctx.fillStyle = COL_RED;
+      ctx.fillText(`\u0394\u03B8 = ${holDeg.toFixed(1)}\u00B0`, mxOff, y3);
+      const mxOff2 = mxOff + ctx.measureText(`\u0394\u03B8 = ${holDeg.toFixed(1)}\u00B0`).width;
+      ctx.fillStyle = colors.fgMuted;
+      ctx.fillText(`,  \uC608\uCE21\uAC12 `, mxOff2, y3);
+      const mxOff3 = mxOff2 + ctx.measureText(',  \uC608\uCE21\uAC12 ').width;
+      ctx.fillStyle = COL_BLUE;
+      ctx.fillText(`Area = ${(area * 180 / Math.PI).toFixed(1)}\u00B0`, mxOff3, y3);
     }
   };
 

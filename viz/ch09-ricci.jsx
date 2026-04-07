@@ -12,16 +12,9 @@ function Ch09Viz() {
 
   const drawRef = useRef(null);
   drawRef.current = (ctx, w, h) => {
-    const cx = w / 2, cy = h / 2;
-    const R = Math.min(w, h) * 0.3;
+    const cx = w / 2, cy = h * 0.42;
+    const R = Math.min(w, h) * 0.26;
     const K = curvature;
-
-    // Draw geodesic "ball" boundary in 2D cross-section
-    // In constant curvature space:
-    // Circumference = 2π * S_K(r) where
-    // K > 0: S_K(r) = sin(√K r)/√K
-    // K = 0: S_K(r) = r
-    // K < 0: S_K(r) = sinh(√|K| r)/√|K|
 
     function S_K(r) {
       if (Math.abs(K) < 0.01) return r;
@@ -72,16 +65,18 @@ function Ch09Viz() {
 
     // Actual geodesic ball at same geodesic radius
     const actScreenR = Math.abs(S_K(refR)) * R / 2.5;
-    ctx.strokeStyle = colors.accent;
+    const ballColor = K > 0.01 ? '#2196F3' : K < -0.01 ? '#e53935' : colors.accent;
+    ctx.strokeStyle = ballColor;
     ctx.lineWidth = 2.5;
     ctx.beginPath();
     ctx.arc(cx, cy, actScreenR, 0, TAU);
     ctx.stroke();
-    ctx.fillStyle = 'rgba(33,150,243,0.1)';
+    const ballAlpha = K > 0.01 ? 'rgba(33,150,243,0.1)' : K < -0.01 ? 'rgba(229,57,53,0.1)' : 'rgba(33,150,243,0.1)';
+    ctx.fillStyle = ballAlpha;
     ctx.fill();
 
     // Center point
-    ctx.fillStyle = colors.accent;
+    ctx.fillStyle = ballColor;
     ctx.beginPath();
     ctx.arc(cx, cy, 4, 0, TAU);
     ctx.fill();
@@ -93,32 +88,96 @@ function Ch09Viz() {
       : K < 0
         ? (2 * Math.PI / (-K)) * (Math.cosh(Math.sqrt(-K) * refR) - 1)
         : eucVol;
-    const ratio = (actVol / eucVol * 100).toFixed(1);
+    const ratio = (actVol / eucVol * 100);
+    const correction = -K / 12 * refR * refR;
+    const approxVol = Math.PI * refR * refR * (1 + correction);
 
-    // Info
+    // --- Formula display at bottom ---
+    const formulaY = h * 0.72;
+    ctx.textAlign = 'left';
+
+    // Title
     ctx.fillStyle = colors.fg;
-    ctx.font = 'bold 15px sans-serif';
+    ctx.font = 'bold 14px sans-serif';
     let label = K > 0.01 ? `양의 곡률 (K = ${K.toFixed(2)})` :
                 K < -0.01 ? `음의 곡률 (K = ${K.toFixed(2)})` :
                 '곡률 0 (유클리드)';
-    ctx.fillText(label, 12, 24);
+    ctx.fillText(label, 12, formulaY - 26);
 
-    ctx.font = '13px sans-serif';
+    // Formula line 1: Vol(B_r) = pi * r^2 * (1 - K/12 * r^2 + ...)
+    ctx.font = '13px monospace';
+    const rVal = refR.toFixed(1);
+    const eucPart = `\u03C0 \u00D7 ${rVal}\u00B2`;
+    const corrVal = correction;
+    const corrSign = corrVal >= 0 ? '+' : '\u2212';
+    const corrAbs = Math.abs(corrVal).toFixed(4);
+
+    // Euclidean part in grey
     ctx.fillStyle = colors.fgMuted;
-    if (Math.abs(K) > 0.01) {
-      ctx.fillText(`측지공 넓이 = 유클리드의 ${ratio}%`, 12, 46);
-      ctx.fillText(
-        K > 0 ? '양의 리치 곡률 → 측지선들이 수렴 → 부피 감소' :
-        '음의 리치 곡률 → 측지선들이 발산 → 부피 증가',
-        12, 66
-      );
+    const fLine1 = 'Vol(B) = ';
+    ctx.fillText(fLine1, 12, formulaY);
+    let xOff = 12 + ctx.measureText(fLine1).width;
+
+    ctx.fillStyle = colors.fgMuted;
+    const eucText = `${eucPart}`;
+    ctx.fillText(eucText, xOff, formulaY);
+    xOff += ctx.measureText(eucText).width;
+
+    ctx.fillStyle = colors.fg;
+    ctx.fillText(' \u00D7 (1 ', xOff, formulaY);
+    xOff += ctx.measureText(' \u00D7 (1 ').width;
+
+    // Correction part in color
+    const corrColor = K > 0.01 ? '#2196F3' : K < -0.01 ? '#e53935' : colors.fgMuted;
+    ctx.fillStyle = corrColor;
+    const corrText = `${corrSign} ${corrAbs}`;
+    ctx.fillText(corrText, xOff, formulaY);
+    xOff += ctx.measureText(corrText).width;
+
+    ctx.fillStyle = colors.fg;
+    ctx.fillText(' + ...)', xOff, formulaY);
+
+    // Formula line 2: breakdown of correction term
+    ctx.font = '12px monospace';
+    ctx.fillStyle = corrColor;
+    const kSign = K >= 0 ? '' : '\u2212';
+    const kAbs = Math.abs(K).toFixed(2);
+    ctx.fillText(
+      `  \u2514\u2500 \u2212K/12 \u00D7 r\u00B2 = \u2212(${kSign}${kAbs})/12 \u00D7 ${rVal}\u00B2 = ${corrSign}${corrAbs}`,
+      12, formulaY + 18
+    );
+
+    // Formula line 3: actual computed value and ratio
+    ctx.font = '13px monospace';
+    ctx.fillStyle = colors.fg;
+    ctx.fillText(`  = ${approxVol.toFixed(4)}`, 12, formulaY + 40);
+
+    // Exact value and ratio
+    ctx.fillStyle = colors.fg;
+    ctx.font = '13px monospace';
+    ctx.fillText(`정확한 넓이 = ${actVol.toFixed(4)}`, 12, formulaY + 62);
+
+    // Ratio highlight
+    ctx.fillStyle = ballColor;
+    ctx.font = 'bold 13px monospace';
+    ctx.fillText(`= 유클리드의 ${ratio.toFixed(1)}%`, 12, formulaY + 82);
+
+    // Explanation
+    ctx.fillStyle = colors.fgMuted;
+    ctx.font = '12px sans-serif';
+    if (K > 0.01) {
+      ctx.fillText('양의 리치 곡률 \u2192 측지선 수렴 \u2192 부피 감소', 12, formulaY + 102);
+    } else if (K < -0.01) {
+      ctx.fillText('음의 리치 곡률 \u2192 측지선 발산 \u2192 부피 증가', 12, formulaY + 102);
     }
 
-    // Legend
-    ctx.fillStyle = colors.accent;
-    ctx.fillText('● 실제 측지공', 12, h - 28);
+    // Legend at very bottom
+    const legY = h - 14;
+    ctx.font = '12px sans-serif';
+    ctx.fillStyle = ballColor;
+    ctx.fillText('\u25CF 실제 측지공', 12, legY);
     ctx.fillStyle = colors.fgMuted;
-    ctx.fillText('◌ 유클리드 기준 (같은 반지름)', 12, h - 10);
+    ctx.fillText('\u25CC 유클리드 기준 (같은 반지름)', 160, legY);
   };
 
   const canvasRef = useCanvas(drawRef);

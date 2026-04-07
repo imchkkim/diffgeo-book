@@ -8,7 +8,6 @@ import { lerp, clamp } from './shared/math.js';
 // 2-simplex (probability simplex for 3 outcomes) in 2D
 // Barycentric to Cartesian
 function baryToCart(p, cx, cy, S) {
-  // Equilateral triangle vertices
   const ax = cx, ay = cy - S * 0.9;
   const bx = cx - S * 0.8, by = cy + S * 0.5;
   const cxx = cx + S * 0.8, cyy = cy + S * 0.5;
@@ -42,7 +41,6 @@ function eGeodesic(p, q, t) {
 function alphaGeodesic(p, q, t, alpha) {
   if (alpha <= -0.99) return mGeodesic(p, q, t);
   if (alpha >= 0.99) return eGeodesic(p, q, t);
-  // General alpha-geodesic via alpha-representation
   const a = (1 - alpha) / 2;
   const f = (x, a) => a === 0 ? Math.log(x) : (Math.pow(x, a) - 1) / a;
   const fInv = (y, a) => a === 0 ? Math.exp(y) : Math.pow(a * y + 1, 1 / a);
@@ -64,8 +62,8 @@ function Ch10Viz() {
 
   const drawRef = useRef(null);
   drawRef.current = (ctx, w, h) => {
-    const cx = w / 2, cy = h / 2 + 10;
-    const S = Math.min(w, h) * 0.4;
+    const cx = w / 2, cy = h * 0.38 + 10;
+    const S = Math.min(w, h) * 0.32;
 
     // Draw simplex triangle
     const verts = [[1, 0, 0], [0, 1, 0], [0, 0, 1]].map(v => baryToCart(v, cx, cy, S));
@@ -83,9 +81,9 @@ function Ch10Viz() {
     ctx.fillStyle = colors.fg;
     ctx.font = '13px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('p₁', verts[0].x, verts[0].y - 10);
-    ctx.fillText('p₂', verts[1].x - 10, verts[1].y + 18);
-    ctx.fillText('p₃', verts[2].x + 10, verts[2].y + 18);
+    ctx.fillText('p\u2081', verts[0].x, verts[0].y - 10);
+    ctx.fillText('p\u2082', verts[1].x - 10, verts[1].y + 18);
+    ctx.fillText('p\u2083', verts[2].x + 10, verts[2].y + 18);
     ctx.textAlign = 'left';
 
     // Grid lines on simplex
@@ -97,12 +95,11 @@ function Ch10Viz() {
       for (let edge = 0; edge < 3; edge++) {
         const from = mGeodesic([1, 0, 0], [0, 1, 0], t);
         const from2 = mGeodesic([1, 0, 0], [0, 0, 1], t);
-        // Draw parallel to each edge
       }
     }
     ctx.globalAlpha = 1;
 
-    // Draw m-geodesic (always, as reference)
+    // Draw m-geodesic (always, as reference) - GREEN
     ctx.strokeStyle = '#43A047';
     ctx.lineWidth = 1.5;
     ctx.setLineDash([5, 5]);
@@ -116,7 +113,7 @@ function Ch10Viz() {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Draw e-geodesic (always, as reference)
+    // Draw e-geodesic (always, as reference) - RED
     ctx.strokeStyle = '#e53935';
     ctx.lineWidth = 1.5;
     ctx.setLineDash([5, 5]);
@@ -130,8 +127,8 @@ function Ch10Viz() {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Draw current alpha-geodesic
-    ctx.strokeStyle = colors.accent;
+    // Draw current alpha-geodesic - PURPLE
+    ctx.strokeStyle = '#7B1FA2';
     ctx.lineWidth = 3;
     ctx.beginPath();
     for (let i = 0; i <= 80; i++) {
@@ -142,29 +139,87 @@ function Ch10Viz() {
     }
     ctx.stroke();
 
-    // Draw endpoints
+    // Draw endpoints with distribution values
     const pScr = baryToCart(p, cx, cy, S);
     const qScr = baryToCart(q, cx, cy, S);
 
+    // Point p
     ctx.fillStyle = colors.accent;
     ctx.beginPath(); ctx.arc(pScr.x, pScr.y, 6, 0, 2 * Math.PI); ctx.fill();
+    // Point q
+    ctx.fillStyle = '#FF9800';
     ctx.beginPath(); ctx.arc(qScr.x, qScr.y, 6, 0, 2 * Math.PI); ctx.fill();
 
-    ctx.fillStyle = colors.fg;
-    ctx.font = '12px sans-serif';
-    ctx.fillText('p = (0.6, 0.3, 0.1)', pScr.x + 10, pScr.y - 4);
-    ctx.fillText('q = (0.1, 0.2, 0.7)', qScr.x + 10, qScr.y + 14);
+    // Endpoint labels with actual values
+    ctx.font = '12px monospace';
+    ctx.fillStyle = colors.accent;
+    ctx.fillText(`p = (${p[0]}, ${p[1]}, ${p[2]})`, pScr.x + 10, pScr.y - 4);
+    ctx.fillStyle = '#FF9800';
+    ctx.fillText(`q = (${q[0]}, ${q[1]}, ${q[2]})`, qScr.x + 10, qScr.y + 14);
 
-    // Legend
-    ctx.font = '13px sans-serif';
-    const ly = 20;
-    ctx.fillStyle = '#43A047'; ctx.fillText('--- m-측지선 (α = −1, 합의 길)', 12, ly);
-    ctx.fillStyle = '#e53935'; ctx.fillText('--- e-측지선 (α = +1, 곱의 길)', 12, ly + 18);
-    ctx.fillStyle = colors.accent; ctx.fillText(`━━ α = ${alpha.toFixed(2)} 측지선`, 12, ly + 36);
-    if (Math.abs(alpha) < 0.05) {
-      ctx.fillStyle = colors.fgMuted;
-      ctx.fillText('(α = 0 = 레비-치비타 접속)', 12, ly + 54);
-    }
+    // Midpoint on current alpha-geodesic
+    const mid = alphaGeodesic(p, q, 0.5, alpha);
+    const midScr = baryToCart(mid, cx, cy, S);
+    ctx.fillStyle = '#7B1FA2';
+    ctx.beginPath(); ctx.arc(midScr.x, midScr.y, 4, 0, 2 * Math.PI); ctx.fill();
+    ctx.font = '11px monospace';
+    ctx.fillText(`t=0.5: (${mid[0].toFixed(2)}, ${mid[1].toFixed(2)}, ${mid[2].toFixed(2)})`, midScr.x + 8, midScr.y - 4);
+
+    // --- Formula display ---
+    const formulaY = h * 0.68;
+    ctx.textAlign = 'left';
+
+    // Connection formula
+    ctx.font = 'bold 13px sans-serif';
+    ctx.fillStyle = colors.fg;
+    const alphaHalf = (alpha / 2).toFixed(2);
+    const alphaLabel = Math.abs(alpha + 1) < 0.05 ? '  (m-접속)' :
+                       Math.abs(alpha - 1) < 0.05 ? '  (e-접속)' :
+                       Math.abs(alpha) < 0.05 ? '  (레비-치비타)' : '';
+
+    ctx.fillText(`\u03B1 = ${alpha.toFixed(2)}${alphaLabel}`, 12, formulaY);
+
+    // Formula line
+    ctx.font = '13px monospace';
+    ctx.fillStyle = colors.fgMuted;
+    const f1 = '\u2207^(\u03B1) = ';
+    ctx.fillText(f1, 12, formulaY + 22);
+    let xOff = 12 + ctx.measureText(f1).width;
+
+    ctx.fillStyle = colors.fgMuted;
+    ctx.fillText('\u2207^(0)', xOff, formulaY + 22);
+    xOff += ctx.measureText('\u2207^(0)').width;
+
+    ctx.fillStyle = colors.fg;
+    ctx.fillText(' + ', xOff, formulaY + 22);
+    xOff += ctx.measureText(' + ').width;
+
+    ctx.fillStyle = '#7B1FA2';
+    const corrText = `(${alphaHalf})\u00B7C`;
+    ctx.fillText(corrText, xOff, formulaY + 22);
+
+    // Geodesic type explanations
+    ctx.font = '12px sans-serif';
+    const expY = formulaY + 46;
+
+    ctx.fillStyle = '#43A047';
+    ctx.fillText('--- m-측지선 (\u03B1=\u22121): 확률의 선형 보간', 12, expY);
+    ctx.fillStyle = colors.fgMuted;
+    ctx.font = '11px monospace';
+    const mMid = mGeodesic(p, q, 0.5);
+    ctx.fillText(`    t=0.5: (1\u2212t)\u00B7p + t\u00B7q = (${mMid[0].toFixed(2)}, ${mMid[1].toFixed(2)}, ${mMid[2].toFixed(2)})`, 12, expY + 16);
+
+    ctx.font = '12px sans-serif';
+    ctx.fillStyle = '#e53935';
+    ctx.fillText('--- e-측지선 (\u03B1=+1): 확률의 기하 보간', 12, expY + 36);
+    ctx.fillStyle = colors.fgMuted;
+    ctx.font = '11px monospace';
+    const eMid = eGeodesic(p, q, 0.5);
+    ctx.fillText(`    t=0.5: p^(1\u2212t)\u00B7q^t / Z = (${eMid[0].toFixed(2)}, ${eMid[1].toFixed(2)}, ${eMid[2].toFixed(2)})`, 12, expY + 52);
+
+    ctx.font = '12px sans-serif';
+    ctx.fillStyle = '#7B1FA2';
+    ctx.fillText(`\u2501\u2501 \u03B1=${alpha.toFixed(2)} 측지선 (현재)`, 12, expY + 72);
   };
 
   const canvasRef = useCanvas(drawRef);
@@ -173,9 +228,9 @@ function Ch10Viz() {
     <div class="viz-inner">
       <canvas ref={canvasRef} />
       <div class="viz-controls">
-        <Slider label="α" min={-1} max={1} step={0.01} value={alpha} onChange={setAlpha} />
+        <Slider label="\u03B1" min={-1} max={1} step={0.01} value={alpha} onChange={setAlpha} />
         <span style={{ color: 'var(--fg-muted)', fontSize: '0.85em' }}>
-          α = −1: m-접속 | α = 0: 레비-치비타 | α = +1: e-접속
+          \u03B1 = \u22121: m-접속 | \u03B1 = 0: 레비-치비타 | \u03B1 = +1: e-접속
         </span>
       </div>
     </div>
