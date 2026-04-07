@@ -1,0 +1,17 @@
+{
+  "name": "diffgeo-book",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "cp build.cjs /tmp/diffgeo-build/build.cjs && cd /tmp/diffgeo-build && node build.cjs /home/hakkyu/diffgeo-book"
+  },
+  "dependencies": {
+    "katex": "^0.16.38",
+    "markdown-it": "^13.0.2",
+    "markdown-it-texmath": "^1.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "preact": "^10.25.0"
+  }
+}
