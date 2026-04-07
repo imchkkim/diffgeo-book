@@ -31,13 +31,14 @@ function parallelTransportArc(vec, from, to, steps = 40) {
 function Ch07Viz() {
   const colors = useThemeColors();
   const [size, setSize] = useState(0.8);
-  const [rotY, setRotY] = useState(-0.3);
-  const [rotX, setRotX] = useState(0.35);
+  const rot = useRef({ y: -0.3, x: 0.35 });
   const dragRef = useRef(null);
 
-  const draw = useCallback((ctx, w, h) => {
+  const drawRef = useRef(null);
+  drawRef.current = (ctx, w, h) => {
     const cx = w / 2, cy = h / 2;
     const R = Math.min(w, h) * 0.36;
+    const rotY = rot.current.y, rotX = rot.current.x;
 
     drawSphereWireframe(ctx, cx, cy, R, rotY, rotX, colors.fgMuted);
 
@@ -140,16 +141,18 @@ function Ch07Viz() {
     ctx.fillStyle = colors.fgMuted;
     ctx.fillText(`≈ 넓이 × 곡률 (R=1 구면에서 K=1)`, 12, 42);
     ctx.fillText('드래그하여 회전', 12, h - 12);
-  }, [size, rotY, rotX, colors]);
+  };
 
-  const canvasRef = useCanvas(draw, [draw]);
+  const canvasRef = useCanvas(drawRef);
 
   usePointer(canvasRef, {
-    onDown: (pos) => { dragRef.current = { x: pos.x, y: pos.y, rotY, rotX }; },
+    onDown: (pos) => { dragRef.current = { mx: pos.x, my: pos.y, ry: rot.current.y, rx: rot.current.x }; },
     onDrag: (pos) => {
       if (!dragRef.current) return;
-      setRotY(dragRef.current.rotY + (pos.x - dragRef.current.x) * 0.01);
-      setRotX(dragRef.current.rotX - (pos.y - dragRef.current.y) * 0.01);
+      rot.current = {
+        y: dragRef.current.ry + (pos.x - dragRef.current.mx) * 0.01,
+        x: dragRef.current.rx - (pos.y - dragRef.current.my) * 0.01,
+      };
     },
     onUp: () => { dragRef.current = null; },
   });

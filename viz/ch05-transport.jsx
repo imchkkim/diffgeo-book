@@ -34,8 +34,7 @@ function parallelTransportAlongArc(vec, from, to, steps = 60) {
 
 function Ch05Viz() {
   const colors = useThemeColors();
-  const [rotY, setRotY] = useState(-0.4);
-  const [rotX, setRotX] = useState(0.3);
+  const rot = useRef({ y: -0.4, x: 0.3 });
   const [progress, setProgress] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [colatitude, setColatitude] = useState(1.2);
@@ -90,10 +89,12 @@ function Ch05Viz() {
     return () => cancelAnimationFrame(animRef.current);
   }, [playing]);
 
-  const draw = useCallback((ctx, w, h) => {
+  const drawRef = useRef(null);
+  drawRef.current = (ctx, w, h) => {
     const cx = w / 2;
     const cy = h / 2;
     const R = Math.min(w, h) * 0.35;
+    const rotY = rot.current.y, rotX = rot.current.x;
 
     // Sphere wireframe
     drawSphereWireframe(ctx, cx, cy, R, rotY, rotX, colors.fgMuted);
@@ -182,18 +183,18 @@ function Ch05Viz() {
       ctx.fillStyle = colors.fgMuted;
       ctx.fillText(`(구면 삼각형의 넓이 = ${(holAngle).toFixed(3)} rad)`, 12, 48);
     }
-  }, [rotY, rotX, progress, colors, colatitude]);
+  };
 
-  const canvasRef = useCanvas(draw, [draw]);
+  const canvasRef = useCanvas(drawRef);
 
   usePointer(canvasRef, {
-    onDown: (pos) => { dragRef.current = { x: pos.x, y: pos.y, rotY, rotX }; },
+    onDown: (pos) => { dragRef.current = { mx: pos.x, my: pos.y, ry: rot.current.y, rx: rot.current.x }; },
     onDrag: (pos) => {
       if (!dragRef.current) return;
-      const dx = pos.x - dragRef.current.x;
-      const dy = pos.y - dragRef.current.y;
-      setRotY(dragRef.current.rotY + dx * 0.01);
-      setRotX(dragRef.current.rotX - dy * 0.01);
+      rot.current = {
+        y: dragRef.current.ry + (pos.x - dragRef.current.mx) * 0.01,
+        x: dragRef.current.rx - (pos.y - dragRef.current.my) * 0.01,
+      };
     },
     onUp: () => { dragRef.current = null; },
   });

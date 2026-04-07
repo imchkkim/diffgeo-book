@@ -1,5 +1,5 @@
 import { h, render } from 'preact';
-import { useState, useCallback } from 'preact/hooks';
+import { useState, useRef } from 'preact/hooks';
 import { useCanvas } from './shared/canvas-utils.jsx';
 import { Slider } from './shared/controls.jsx';
 import { useThemeColors } from './shared/theme.jsx';
@@ -62,7 +62,8 @@ function Ch10Viz() {
   const p = [0.6, 0.3, 0.1];
   const q = [0.1, 0.2, 0.7];
 
-  const draw = useCallback((ctx, w, h) => {
+  const drawRef = useRef(null);
+  drawRef.current = (ctx, w, h) => {
     const cx = w / 2, cy = h / 2 + 10;
     const S = Math.min(w, h) * 0.4;
 
@@ -164,9 +165,9 @@ function Ch10Viz() {
       ctx.fillStyle = colors.fgMuted;
       ctx.fillText('(α = 0 = 레비-치비타 접속)', 12, ly + 54);
     }
-  }, [alpha, colors]);
+  };
 
-  const canvasRef = useCanvas(draw, [draw]);
+  const canvasRef = useCanvas(drawRef);
 
   return (
     <div class="viz-inner">

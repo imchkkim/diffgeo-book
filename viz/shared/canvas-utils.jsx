@@ -2,55 +2,75 @@ import { useEffect, useRef, useCallback } from 'preact/hooks';
 
 export function setupCanvas(canvas) {
   const dpr = window.devicePixelRatio || 1;
-  const rect = canvas.getBoundingClientRect();
+  const container = canvas.parentElement;
+  const rect = container.getBoundingClientRect();
   canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
+  canvas.height = canvas.offsetHeight * dpr;
   const ctx = canvas.getContext('2d');
   ctx.scale(dpr, dpr);
 
-  const ro = new ResizeObserver(([entry]) => {
-    const { width, height } = entry.contentRect;
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
-    ctx.scale(dpr, dpr);
+  const ro = new ResizeObserver(() => {
+    const w = container.clientWidth;
+    const h = canvas.offsetHeight;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    const c = canvas.getContext('2d');
+    c.scale(dpr, dpr);
   });
-  ro.observe(canvas);
+  ro.observe(container);
 
-  return { ctx, w: rect.width, h: rect.height, cleanup: () => ro.disconnect() };
+  return { ctx, w: rect.width, h: canvas.offsetHeight, cleanup: () => ro.disconnect() };
 }
 
-export function useCanvas(draw, deps = []) {
+export function useCanvas(drawRef) {
   const canvasRef = useRef(null);
   const rafRef = useRef(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const { ctx, cleanup } = setupCanvas(canvas);
 
-    const render = () => {
-      const rect = canvas.getBoundingClientRect();
-      ctx.clearRect(0, 0, rect.width, rect.height);
-      draw(ctx, rect.width, rect.height);
-      rafRef.current = requestAnimationFrame(render);
-    };
-    rafRef.current = requestAnimationFrame(render);
+    const dpr = window.devicePixelRatio || 1;
 
-    return () => {
-      cancelAnimationFrame(rafRef.current);
-      cleanup();
+    function sizeCanvas() {
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+        canvas.width = w * dpr;
+        canvas.height = h * dpr;
+      }
+    }
+
+    sizeCanvas();
+
+    const loop = () => {
+      sizeCanvas();
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      drawRef.current(ctx, w, h);
+      rafRef.current = requestAnimationFrame(loop);
     };
-  }, deps);
+    rafRef.current = requestAnimationFrame(loop);
+
+    return () => cancelAnimationFrame(rafRef.current);
+  }, []);
 
   return canvasRef;
 }
 
 export function usePointer(canvasRef, handlers) {
+  const hRef = useRef(handlers);
+  hRef.current = handlers;
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     let dragging = false;
+    let moved = false;
 
     function getPos(e) {
       const rect = canvas.getBoundingClientRect();
@@ -60,19 +80,30 @@ export function usePointer(canvasRef, handlers) {
 
     function onDown(e) {
       dragging = true;
-      handlers.onDown?.(getPos(e));
+      moved = false;
+      hRef.current.onDown?.(getPos(e));
       e.preventDefault();
     }
     function onMove(e) {
       const pos = getPos(e);
-      if (dragging) handlers.onDrag?.(pos);
-      else handlers.onHover?.(pos);
+      if (dragging) {
+        moved = true;
+        hRef.current.onDrag?.(pos);
+      } else {
+        hRef.current.onHover?.(pos);
+      }
       e.preventDefault();
     }
     function onUp(e) {
       if (dragging) {
         dragging = false;
-        handlers.onUp?.(e.changedTouches ? { x: 0, y: 0 } : getPos(e));
+        const pos = e.changedTouches ? { x: 0, y: 0 } : getPos(e);
+        if (moved) {
+          hRef.current.onUp?.(pos);
+        } else {
+          hRef.current.onClick?.(pos);
+          hRef.current.onUp?.(pos);
+        }
       }
     }
 
@@ -93,5 +124,5 @@ export function usePointer(canvasRef, handlers) {
       canvas.removeEventListener('touchmove', onMove);
       canvas.removeEventListener('touchend', onUp);
     };
-  }, [canvasRef.current, ...Object.values(handlers)]);
+  }, [canvasRef.current]);
 }

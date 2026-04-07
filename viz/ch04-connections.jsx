@@ -1,5 +1,5 @@
 import { h, render } from 'preact';
-import { useState, useCallback } from 'preact/hooks';
+import { useState, useRef } from 'preact/hooks';
 import { useCanvas } from './shared/canvas-utils.jsx';
 import { Toggle } from './shared/controls.jsx';
 import { useThemeColors } from './shared/theme.jsx';
@@ -9,7 +9,8 @@ function Ch04Viz() {
   const colors = useThemeColors();
   const [showCorrection, setShowCorrection] = useState(false);
 
-  const draw = useCallback((ctx, w, h) => {
+  const drawRef = useRef(null);
+  drawRef.current = (ctx, w, h) => {
     const cx = w / 2, cy = h / 2;
     const maxR = Math.min(w, h) * 0.42;
 
@@ -90,9 +91,9 @@ function Ch04Viz() {
       showCorrection ? 'Γ 보정이 좌표계의 잡음을 상쇄' : '극좌표에서 편미분하면 좌표 변화가 섞여 들어온다',
       12, h - 12
     );
-  }, [showCorrection, colors]);
+  };
 
-  const canvasRef = useCanvas(draw, [draw]);
+  const canvasRef = useCanvas(drawRef);
 
   return (
     <div class="viz-inner">

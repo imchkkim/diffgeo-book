@@ -1,5 +1,5 @@
 import { h, render } from 'preact';
-import { useState, useRef, useCallback } from 'preact/hooks';
+import { useState, useRef } from 'preact/hooks';
 import { useCanvas, usePointer } from './shared/canvas-utils.jsx';
 import { useThemeColors } from './shared/theme.jsx';
 import { clamp } from './shared/math.js';
@@ -43,7 +43,8 @@ function Ch06Viz() {
   const [fromIdx, setFromIdx] = useState(0);
   const [toIdx, setToIdx] = useState(1);
 
-  const draw = useCallback((ctx, w, h) => {
+  const drawRef = useRef(null);
+  drawRef.current = (ctx, w, h) => {
     const mapW = w * 0.92, mapH = h * 0.82;
     const ox = (w - mapW) / 2, oy = (h - mapH) / 2;
     const lonScale = mapW / (2 * Math.PI);
@@ -133,9 +134,9 @@ function Ch06Viz() {
     ctx.beginPath(); ctx.moveTo(12, h - 12); ctx.lineTo(40, h - 12); ctx.stroke();
     ctx.setLineDash([]);
     ctx.fillText('메르카토르 직선 (등각항로)', 44, h - 8);
-  }, [fromIdx, toIdx, colors]);
+  };
 
-  const canvasRef = useCanvas(draw, [draw]);
+  const canvasRef = useCanvas(drawRef);
 
   return (
     <div class="viz-inner">

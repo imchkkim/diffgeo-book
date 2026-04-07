@@ -1,5 +1,5 @@
 import { h, render } from 'preact';
-import { useState, useCallback } from 'preact/hooks';
+import { useState, useRef } from 'preact/hooks';
 import { useCanvas } from './shared/canvas-utils.jsx';
 import { Slider } from './shared/controls.jsx';
 import { useThemeColors } from './shared/theme.jsx';
@@ -10,7 +10,8 @@ function Ch09Viz() {
   const colors = useThemeColors();
   const [curvature, setCurvature] = useState(0);
 
-  const draw = useCallback((ctx, w, h) => {
+  const drawRef = useRef(null);
+  drawRef.current = (ctx, w, h) => {
     const cx = w / 2, cy = h / 2;
     const R = Math.min(w, h) * 0.3;
     const K = curvature;
@@ -118,9 +119,9 @@ function Ch09Viz() {
     ctx.fillText('● 실제 측지공', 12, h - 28);
     ctx.fillStyle = colors.fgMuted;
     ctx.fillText('◌ 유클리드 기준 (같은 반지름)', 12, h - 10);
-  }, [curvature, colors]);
+  };
 
-  const canvasRef = useCanvas(draw, [draw]);
+  const canvasRef = useCanvas(drawRef);
 
   return (
     <div class="viz-inner">

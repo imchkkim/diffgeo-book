@@ -1,5 +1,5 @@
 import { h, render } from 'preact';
-import { useState, useCallback } from 'preact/hooks';
+import { useState, useRef } from 'preact/hooks';
 import { useCanvas } from './shared/canvas-utils.jsx';
 import { Select } from './shared/controls.jsx';
 import { useThemeColors } from './shared/theme.jsx';
@@ -17,7 +17,8 @@ function Ch08Viz() {
   const colors = useThemeColors();
   const [surface, setSurface] = useState('sphere');
 
-  const draw = useCallback((ctx, w, h) => {
+  const drawRef = useRef(null);
+  drawRef.current = (ctx, w, h) => {
     const cx = w / 2, cy = h / 2;
     const S = Math.min(w, h) * 0.35;
 
@@ -143,9 +144,9 @@ function Ch08Viz() {
       case 'saddle': ctx.fillText('κ₁ > 0, κ₂ < 0 → K = κ₁κ₂ < 0', 12, h - 12); break;
       case 'plane': ctx.fillText('κ₁ = 0, κ₂ = 0 → K = 0', 12, h - 12); break;
     }
-  }, [surface, colors]);
+  };
 
-  const canvasRef = useCanvas(draw, [draw]);
+  const canvasRef = useCanvas(drawRef);
 
   return (
     <div class="viz-inner">

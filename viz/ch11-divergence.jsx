@@ -1,5 +1,5 @@
 import { h, render } from 'preact';
-import { useState, useCallback } from 'preact/hooks';
+import { useState, useRef } from 'preact/hooks';
 import { useCanvas } from './shared/canvas-utils.jsx';
 import { Slider } from './shared/controls.jsx';
 import { useThemeColors } from './shared/theme.jsx';
@@ -25,7 +25,8 @@ function Ch11Viz() {
   const [q1, setQ1] = useState(0.2);
   const [q2, setQ2] = useState(0.5);
 
-  const draw = useCallback((ctx, w, h) => {
+  const drawRef = useRef(null);
+  drawRef.current = (ctx, w, h) => {
     const p = makeDist(p1, p2);
     const q = makeDist(q1, q2);
     const dpq = klDiv(p, q);
@@ -121,9 +122,9 @@ function Ch11Viz() {
     }
 
     ctx.textAlign = 'left';
-  }, [p1, p2, q1, q2, colors]);
+  };
 
-  const canvasRef = useCanvas(draw, [draw]);
+  const canvasRef = useCanvas(drawRef);
 
   return (
     <div class="viz-inner">

@@ -1,5 +1,5 @@
 import { h, render } from 'preact';
-import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import { useCanvas } from './shared/canvas-utils.jsx';
 import { useThemeColors } from './shared/theme.jsx';
 
@@ -75,7 +75,8 @@ function Ch12Viz() {
   const [startX, setStartX] = useState(-0.5);
   const [startY, setStartY] = useState(2.5);
 
-  const draw = useCallback((ctx, w, h) => {
+  const drawRef = useRef(null);
+  drawRef.current = (ctx, w, h) => {
     const xRange = [-1.5, 2.5], yRange = [-0.5, 3.5];
     const plotW = w, plotH = h;
 
@@ -178,9 +179,9 @@ function Ch12Viz() {
     ctx.fillStyle = colors.fgMuted;
     ctx.font = '12px sans-serif';
     ctx.fillText('자연 경사는 계량을 고려하여 더 효율적인 경로를 따른다', 12, h - 10);
-  }, [startX, startY, colors]);
+  };
 
-  const canvasRef = useCanvas(draw, [draw]);
+  const canvasRef = useCanvas(drawRef);
 
   // Click to set start point
   useEffect(() => {

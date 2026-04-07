@@ -1,5 +1,5 @@
 import { h, render } from 'preact';
-import { useState, useCallback } from 'preact/hooks';
+import { useState, useRef } from 'preact/hooks';
 import { useCanvas } from './shared/canvas-utils.jsx';
 import { Slider } from './shared/controls.jsx';
 import { useThemeColors } from './shared/theme.jsx';
@@ -15,7 +15,8 @@ function Ch03Viz() {
   const colors = useThemeColors();
   const [lat, setLat] = useState(0);
 
-  const draw = useCallback((ctx, w, h) => {
+  const drawRef = useRef(null);
+  drawRef.current = (ctx, w, h) => {
     const mapW = w * 0.9, mapH = h * 0.85;
     const ox = (w - mapW) / 2, oy = (h - mapH) / 2;
     const lonScale = mapW / (2 * Math.PI);
@@ -118,9 +119,9 @@ function Ch03Viz() {
     ctx.fillText('● 메르카토르 위의 원 (왜곡됨)', 12, h - 30);
     ctx.fillStyle = colors.accent;
     ctx.fillText('◌ 실제 크기 (기준)', 12, h - 12);
-  }, [lat, colors]);
+  };
 
-  const canvasRef = useCanvas(draw, [draw]);
+  const canvasRef = useCanvas(drawRef);
 
   return (
     <div class="viz-inner">
