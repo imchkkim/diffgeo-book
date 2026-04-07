@@ -2,7 +2,7 @@ import { h, render } from 'preact';
 import { useState, useRef } from 'preact/hooks';
 import { useCanvas, usePointer } from './shared/canvas-utils.jsx';
 import { useThemeColors } from './shared/theme.jsx';
-import { clamp } from './shared/math.js';
+import { clamp, project3D, drawSphereWireframe } from './shared/math.js';
 
 const TAU = 2 * Math.PI;
 const DEG = Math.PI / 180;
@@ -10,14 +10,11 @@ const DEG = Math.PI / 180;
 function mercY(lat) { return Math.log(Math.tan(Math.PI / 4 + lat / 2)); }
 const MAX_LAT = 82 * DEG;
 
-// Great circle path points
-function greatCirclePoints(lat1, lon1, lat2, lon2, n = 100) {
+function greatCirclePoints(lat1, lon1, lat2, lon2, n = 120) {
   const pts = [];
-  const dLat = lat2 - lat1, dLon = lon2 - lon1;
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  const a = Math.sin((lat2 - lat1) / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin((lon2 - lon1) / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   if (c < 1e-10) return [[lat1, lon1]];
-
   for (let i = 0; i <= n; i++) {
     const f = i / n;
     const A = Math.sin((1 - f) * c) / Math.sin(c);
@@ -28,6 +25,19 @@ function greatCirclePoints(lat1, lon1, lat2, lon2, n = 100) {
     pts.push([Math.atan2(z, Math.sqrt(x * x + y * y)), Math.atan2(y, x)]);
   }
   return pts;
+}
+
+function rhumbLinePoints(lat1, lon1, lat2, lon2, n = 120) {
+  const pts = [];
+  for (let i = 0; i <= n; i++) {
+    const f = i / n;
+    pts.push([lat1 + f * (lat2 - lat1), lon1 + f * (lon2 - lon1)]);
+  }
+  return pts;
+}
+
+function latLonToCart(lat, lon, r = 1) {
+  return [r * Math.cos(lat) * Math.cos(lon), r * Math.cos(lat) * Math.sin(lon), r * Math.sin(lat)];
 }
 
 const CITIES = [
@@ -42,101 +52,187 @@ function Ch06Viz() {
   const colors = useThemeColors();
   const [fromIdx, setFromIdx] = useState(0);
   const [toIdx, setToIdx] = useState(1);
+  const rot = useRef({ y: -1.8, x: 0.3 });
+  const dragRef = useRef(null);
 
   const drawRef = useRef(null);
   drawRef.current = (ctx, w, h) => {
-    const mapW = w * 0.92, mapH = h * 0.82;
-    const ox = (w - mapW) / 2, oy = (h - mapH) / 2;
-    const lonScale = mapW / (2 * Math.PI);
-    const maxMY = mercY(MAX_LAT);
-    const latScale = (mapH / 2) / maxMY;
+    const mid = w * 0.5;
+    const from = CITIES[fromIdx], to = CITIES[toIdx];
+    const gcPts = greatCirclePoints(from.lat, from.lon, to.lat, to.lon);
+    const rhPts = rhumbLinePoints(from.lat, from.lon, to.lat, to.lon);
 
-    function toScreen(lat, lon) {
+    // === LEFT: Mercator 2D ===
+    const mW = mid - 16, mH = h - 50;
+    const mox = 8, moy = 30;
+    const lonScale = mW / (2 * Math.PI);
+    const maxMY = mercY(MAX_LAT);
+    const latScale = (mH / 2) / maxMY;
+
+    function toMerc(lat, lon) {
       return {
-        x: ox + mapW / 2 + lon * lonScale,
-        y: oy + mapH / 2 - mercY(clamp(lat, -MAX_LAT, MAX_LAT)) * latScale,
+        x: mox + mW / 2 + lon * lonScale,
+        y: moy + mH / 2 - mercY(clamp(lat, -MAX_LAT, MAX_LAT)) * latScale,
       };
     }
 
-    // Map background
+    // Map bg
     ctx.fillStyle = colors.bgCode || colors.bg;
-    ctx.fillRect(ox, oy, mapW, mapH);
+    ctx.fillRect(mox, moy, mW, mH);
 
     // Grid
     ctx.strokeStyle = colors.border;
     ctx.lineWidth = 0.5;
     for (let lon = -180; lon <= 180; lon += 30) {
-      const p = toScreen(0, lon * DEG);
-      ctx.beginPath();
-      ctx.moveTo(p.x, oy); ctx.lineTo(p.x, oy + mapH); ctx.stroke();
+      const p = toMerc(0, lon * DEG);
+      ctx.beginPath(); ctx.moveTo(p.x, moy); ctx.lineTo(p.x, moy + mH); ctx.stroke();
     }
     for (let lat = -60; lat <= 60; lat += 30) {
-      const p = toScreen(lat * DEG, 0);
-      ctx.beginPath();
-      ctx.moveTo(ox, p.y); ctx.lineTo(ox + mapW, p.y); ctx.stroke();
+      const p = toMerc(lat * DEG, 0);
+      ctx.beginPath(); ctx.moveTo(mox, p.y); ctx.lineTo(mox + mW, p.y); ctx.stroke();
     }
 
-    const from = CITIES[fromIdx], to = CITIES[toIdx];
-
-    // Straight line on Mercator (rhumb line)
+    // Rhumb line (Mercator straight line)
     ctx.strokeStyle = '#e53935';
     ctx.lineWidth = 2;
     ctx.setLineDash([6, 4]);
-    const pFrom = toScreen(from.lat, from.lon);
-    const pTo = toScreen(to.lat, to.lon);
     ctx.beginPath();
-    ctx.moveTo(pFrom.x, pFrom.y);
-    ctx.lineTo(pTo.x, pTo.y);
+    let prevMX = null;
+    for (const [lat, lon] of rhPts) {
+      const p = toMerc(lat, lon);
+      if (prevMX !== null && Math.abs(p.x - prevMX) > mW * 0.4) {
+        ctx.stroke(); ctx.beginPath(); ctx.moveTo(p.x, p.y);
+      } else {
+        if (prevMX === null) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+      }
+      prevMX = p.x;
+    }
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Great circle (geodesic)
-    const gcPts = greatCirclePoints(from.lat, from.lon, to.lat, to.lon);
+    // Great circle on Mercator
     ctx.strokeStyle = colors.accent;
     ctx.lineWidth = 2.5;
     ctx.beginPath();
-    let prevX = null;
+    prevMX = null;
     for (const [lat, lon] of gcPts) {
-      const p = toScreen(lat, lon);
-      if (prevX !== null && Math.abs(p.x - prevX) > mapW * 0.4) {
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(p.x, p.y);
+      const p = toMerc(lat, lon);
+      if (prevMX !== null && Math.abs(p.x - prevMX) > mW * 0.4) {
+        ctx.stroke(); ctx.beginPath(); ctx.moveTo(p.x, p.y);
       } else {
-        if (prevX === null) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
+        if (prevMX === null) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
       }
-      prevX = p.x;
+      prevMX = p.x;
     }
     ctx.stroke();
 
-    // City dots
+    // City dots on Mercator
     for (const city of CITIES) {
-      const p = toScreen(city.lat, city.lon);
-      ctx.fillStyle = (city === from || city === to) ? colors.accent : colors.fgMuted;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, (city === from || city === to) ? 5 : 3, 0, TAU);
-      ctx.fill();
-      ctx.fillStyle = colors.fg;
-      ctx.font = '12px sans-serif';
-      ctx.fillText(city.name, p.x + 7, p.y + 4);
+      const p = toMerc(city.lat, city.lon);
+      const active = city === from || city === to;
+      ctx.fillStyle = active ? colors.accent : colors.fgMuted;
+      ctx.beginPath(); ctx.arc(p.x, p.y, active ? 5 : 3, 0, TAU); ctx.fill();
+      if (active) {
+        ctx.fillStyle = colors.fg;
+        ctx.font = '11px sans-serif';
+        ctx.fillText(city.name, p.x + 7, p.y + 4);
+      }
     }
 
-    // Legend
-    ctx.font = '13px sans-serif';
-    ctx.strokeStyle = colors.accent; ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.moveTo(12, h - 32); ctx.lineTo(40, h - 32); ctx.stroke();
     ctx.fillStyle = colors.fg;
-    ctx.fillText('대원 (측지선, 실제 최단경로)', 44, h - 28);
+    ctx.font = 'bold 12px sans-serif';
+    ctx.fillText('메르카토르 도법 (2D)', mox, 20);
+
+    // === RIGHT: 3D Sphere ===
+    const sCx = mid + (w - mid) / 2, sCy = h / 2;
+    const sR = Math.min(w - mid, h) * 0.38;
+    const { y: rotY, x: rotX } = rot.current;
+
+    // Wireframe
+    drawSphereWireframe(ctx, sCx, sCy, sR, rotY, rotX, colors.fgMuted, 20);
+
+    // Helper to project lat/lon to 3D screen
+    function toSphere(lat, lon) {
+      const cart = latLonToCart(lat, lon, sR);
+      return project3D(cart, sCx, sCy, 1, rotY, rotX);
+    }
+
+    // Rhumb line on sphere
+    ctx.strokeStyle = '#e53935';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 3]);
+    ctx.beginPath();
+    let started = false;
+    for (const [lat, lon] of rhPts) {
+      const p = toSphere(lat, lon);
+      if (p.z < 0) { started = false; continue; }
+      if (!started) { ctx.moveTo(p.x, p.y); started = true; }
+      else ctx.lineTo(p.x, p.y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Great circle on sphere
+    ctx.strokeStyle = colors.accent;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    started = false;
+    for (const [lat, lon] of gcPts) {
+      const p = toSphere(lat, lon);
+      if (p.z < 0) { started = false; continue; }
+      if (!started) { ctx.moveTo(p.x, p.y); started = true; }
+      else ctx.lineTo(p.x, p.y);
+    }
+    ctx.stroke();
+
+    // City dots on sphere
+    for (const city of CITIES) {
+      const p = toSphere(city.lat, city.lon);
+      if (p.z < 0) continue;
+      const active = city === from || city === to;
+      ctx.fillStyle = active ? colors.accent : colors.fgMuted;
+      ctx.beginPath(); ctx.arc(p.x, p.y, active ? 5 : 3, 0, TAU); ctx.fill();
+      if (active) {
+        ctx.fillStyle = colors.fg;
+        ctx.font = '11px sans-serif';
+        ctx.fillText(city.name, p.x + 7, p.y + 4);
+      }
+    }
+
+    ctx.fillStyle = colors.fg;
+    ctx.font = 'bold 12px sans-serif';
+    ctx.fillText('3D 구면 (드래그 회전)', mid + 8, 20);
+
+    // === Bottom legend ===
+    ctx.font = '12px sans-serif';
+    ctx.strokeStyle = colors.accent; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(8, h - 14); ctx.lineTo(30, h - 14); ctx.stroke();
+    ctx.fillStyle = colors.fg;
+    ctx.fillText('대원 (측지선) — 실제 최단경로', 34, h - 10);
 
     ctx.strokeStyle = '#e53935'; ctx.lineWidth = 2;
-    ctx.setLineDash([6, 4]);
-    ctx.beginPath(); ctx.moveTo(12, h - 12); ctx.lineTo(40, h - 12); ctx.stroke();
+    ctx.setLineDash([5, 3]);
+    ctx.beginPath(); ctx.moveTo(w / 2, h - 14); ctx.lineTo(w / 2 + 22, h - 14); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillText('메르카토르 직선 (등각항로)', 44, h - 8);
+    ctx.fillText('등각항로 — 메르카토르 위 직선', w / 2 + 28, h - 10);
   };
 
   const canvasRef = useCanvas(drawRef);
+
+  // Drag to rotate the 3D sphere (right half only)
+  usePointer(canvasRef, {
+    onDown: (pos) => {
+      dragRef.current = { mx: pos.x, my: pos.y, ry: rot.current.y, rx: rot.current.x };
+    },
+    onDrag: (pos) => {
+      if (!dragRef.current) return;
+      rot.current = {
+        y: dragRef.current.ry + (pos.x - dragRef.current.mx) * 0.01,
+        x: dragRef.current.rx - (pos.y - dragRef.current.my) * 0.01,
+      };
+    },
+    onUp: () => { dragRef.current = null; },
+  });
 
   return (
     <div class="viz-inner">
@@ -144,12 +240,12 @@ function Ch06Viz() {
       <div class="viz-controls">
         <label class="viz-select"><span>출발</span>
           <select value={fromIdx} onChange={e => setFromIdx(+e.target.value)}>
-            {CITIES.map((c, i) => <option value={i}>{c.name}</option>)}
+            {CITIES.map((c, i) => <option key={i} value={i}>{c.name}</option>)}
           </select>
         </label>
         <label class="viz-select"><span>도착</span>
           <select value={toIdx} onChange={e => setToIdx(+e.target.value)}>
-            {CITIES.map((c, i) => <option value={i}>{c.name}</option>)}
+            {CITIES.map((c, i) => <option key={i} value={i}>{c.name}</option>)}
           </select>
         </label>
       </div>
