@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "cp build.cjs /tmp/diffgeo-build/build.cjs && cd /tmp/diffgeo-build && node build.cjs /home/hakkyu/diffgeo-book"
+    "build": "node build.cjs"
   },
   "dependencies": {
-    "katex": "^0.16.38",
+    "katex": "^0.16.45",
     "markdown-it": "^13.0.2",
     "markdown-it-texmath": "^1.0.0"
   },
