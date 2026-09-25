@@ -99,11 +99,11 @@ export function parallelTransportS2(v, from, to) {
   const fromN = vecNormalize(from);
   const toN = vecNormalize(to);
   const dot = vecDot(fromN, toN);
-  if (dot > 0.9999) return v;
-  if (dot < -0.9999) return vecScale(v, -1);
-
   const axis = vecCross(fromN, toN);
-  const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
+  const s = vecNorm(axis);
+  // 짧은 걸음도 버리지 않는다(예전 dot > 0.9999 생략은 작은 고리에서 1% 오차를 냈다)
+  if (s < 1e-12) return dot > 0 ? v : vecScale(v, -1);
+  const angle = Math.atan2(s, dot);
   const R = rotationMatrix(axis, angle);
   return matVec3(R, v);
 }

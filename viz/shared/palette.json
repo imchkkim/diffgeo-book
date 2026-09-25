@@ -1,0 +1,118 @@
+{
+  "_comment": "개념별 색의 유일한 정의. 원고(.md)의 \\textcolor 에는 light 값을 쓴다. 빌드가 CSS 변수로 치환해 다크 모드에서 dark 값으로 바꾼다. 표는 docs/집필노트.md §1.",
+  "coord": {
+    "light": "#1b9e77",
+    "dark": "#3fd1a6",
+    "label": "좌표"
+  },
+  "chart": {
+    "light": "#3949ab",
+    "dark": "#8c9eff",
+    "label": "차트 사상 φ"
+  },
+  "dir": {
+    "light": "#1f77b4",
+    "dark": "#5aa9e6",
+    "label": "방향 벡터"
+  },
+  "field": {
+    "light": "#e8710a",
+    "dark": "#ff9f43",
+    "label": "대상 벡터(장)"
+  },
+  "metric": {
+    "light": "#d62728",
+    "dark": "#ff6b6b",
+    "label": "계량 / 피셔 정보"
+  },
+  "conn": {
+    "light": "#9467bd",
+    "dark": "#c39bf0",
+    "label": "접속 / 크리스토펠"
+  },
+  "dual": {
+    "light": "#d4449f",
+    "dark": "#f28ccf",
+    "label": "쌍대 접속"
+  },
+  "alpha": {
+    "light": "#8c564b",
+    "dark": "#d19a8c",
+    "label": "α"
+  },
+  "cubic": {
+    "light": "#8f8f00",
+    "dark": "#d4d44a",
+    "label": "3차 텐서 C"
+  },
+  "curve": {
+    "light": "#0e9aa7",
+    "dark": "#4fd8e6",
+    "label": "곡선 γ"
+  },
+  "riem": {
+    "light": "#c2185b",
+    "dark": "#ff5c9d",
+    "label": "리만 곡률 텐서"
+  },
+  "gauss": {
+    "light": "#b8860b",
+    "dark": "#f2c94c",
+    "label": "가우스 곡률 / 주곡률"
+  },
+  "ricci": {
+    "light": "#5c5ab0",
+    "dark": "#a9a7f0",
+    "label": "리치 곡률"
+  },
+  "scalar": {
+    "light": "#4d8a12",
+    "dark": "#8fd14f",
+    "label": "스칼라 곡률"
+  },
+  "holo": {
+    "light": "#a0522d",
+    "dark": "#e69a6a",
+    "label": "홀로노미 각"
+  },
+  "div": {
+    "light": "#7a5c1e",
+    "dark": "#c9a86a",
+    "label": "발산"
+  },
+  "dist": {
+    "light": "#2e8b3a",
+    "dark": "#6fcf7a",
+    "label": "확률분포"
+  },
+  "loss": {
+    "light": "#6b6b6b",
+    "dark": "#b0b0b0",
+    "label": "손실 함수"
+  },
+  "normal": {
+    "light": "#6d4c41",
+    "dark": "#bcaaa4",
+    "label": "법선 벡터 n"
+  },
+  "dualcoord": {
+    "light": "#bf360c",
+    "dark": "#ff8a65",
+    "label": "쌍대(m) 좌표 η"
+  },
+  "potential": {
+    "light": "#455a64",
+    "dark": "#b0bec5",
+    "label": "볼록 퍼텐셜 ψ, φ"
+  },
+  "covector": {
+    "light": "#a100c1",
+    "dark": "#e07bff",
+    "label": "여접벡터 / 1-형식"
+  },
+  "torsion": {
+    "light": "#7b1fa2",
+    "dark": "#ce93d8",
+    "label": "비틀림 텐서 T"
+  }
+}

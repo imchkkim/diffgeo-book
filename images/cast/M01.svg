@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -40 400 460" width="400" height="460">
+<title>M01 김민준 — 평상</title>
+<path d="M 50 430 C 52 350 110 312 175 302 L 225 302 C 290 312 348 350 350 430 Z" fill="#8d939a" stroke="#2b2b2b" stroke-width="5"/>
+<path d="M 132 312 C 128 282 165 266 200 266 C 235 266 272 282 268 312 C 250 330 150 330 132 312 Z" fill="#6c7279" stroke="#2b2b2b" stroke-width="5"/>
+<path d="M 130 410 C 160 398 240 398 270 410" fill="none" stroke="#2b2b2b" stroke-width="4" opacity=".55"/>
+<path d="M 178 228 L 178 312 Q 200 322 222 312 L 222 228 Z" fill="#f7d5ba" stroke="#2b2b2b" stroke-width="5"/>
+<path d="M 179 262 Q 200 276 221 262" fill="none" stroke="#e9b996" stroke-width="6"/>
+<path d="M 168 302 Q 200 330 232 302" fill="none" stroke="#2b2b2b" stroke-width="5"/>
+<path d="M 188 318 L 183 372" stroke="#2b2b2b" stroke-width="7" stroke-linecap="round"/>
+<path d="M 188 318 L 183 372" stroke="#f4f4f4" stroke-width="3.5" stroke-linecap="round"/>
+<path d="M 212 318 L 217 372" stroke="#2b2b2b" stroke-width="7" stroke-linecap="round"/>
+<path d="M 212 318 L 217 372" stroke="#f4f4f4" stroke-width="3.5" stroke-linecap="round"/>
+<ellipse cx="125" cy="176" rx="13" ry="19" fill="#f7d5ba" stroke="#2b2b2b" stroke-width="5"/>
+<path d="M 129 168 q -5 8 0 16" fill="none" stroke="#e9b996" stroke-width="3"/>
+<ellipse cx="275" cy="176" rx="13" ry="19" fill="#f7d5ba" stroke="#2b2b2b" stroke-width="5"/>
+<path d="M 271 168 q 5 8 0 16" fill="none" stroke="#e9b996" stroke-width="3"/>
+<path d="M 125 160 C 125 100 160 78 200 78 C 240 78 275 100 275 160 C 275 215 245 252 200 252 C 155 252 125 215 125 160 Z" fill="#f7d5ba" stroke="#2b2b2b" stroke-width="5"/>
+<path d="M 201 186 Q 196 197 203 199" fill="none" stroke="#e9b996" stroke-width="4" stroke-linecap="round"/>
+<ellipse cx="170" cy="172" rx="7.2" ry="9.9" fill="#2b2b2b"/>
+<circle cx="172.4" cy="168.7" r="2.5" fill="#fff"/>
+<ellipse cx="230" cy="172" rx="7.2" ry="9.9" fill="#2b2b2b"/>
+<circle cx="232.4" cy="168.7" r="2.5" fill="#fff"/>
+<path d="M 152 144 Q 170.0 139.0 188 142" fill="none" stroke="#4b3527" stroke-width="7" stroke-linecap="round"/>
+<path d="M 248 144 Q 230.0 139.0 212 142" fill="none" stroke="#4b3527" stroke-width="7" stroke-linecap="round"/>
+<path d="M 185.05 216 Q 200 228.35 214.95 216" fill="none" stroke="#2b2b2b" stroke-width="4.5" stroke-linecap="round"/>
+<path d="M 116 180 C 106 120 128 78 168 68 L 160 50 L 186 62 L 194 40 L 212 60 L 234 46 L 236 68 C 272 78 296 118 284 180 C 278 152 270 134 260 124 L 254 142 L 238 120 L 224 140 L 210 118 L 194 138 L 180 116 L 166 136 L 150 120 C 136 132 124 152 116 180 Z" fill="#4b3527" stroke="#2b2b2b" stroke-width="5" stroke-linejoin="round"/>
+<path d="M 206 58 C 204 36 222 22 238 30" fill="none" stroke="#2b2b2b" stroke-width="9" stroke-linecap="round"/>
+<path d="M 206 58 C 204 36 222 22 238 30" fill="none" stroke="#4b3527" stroke-width="4" stroke-linecap="round"/>
+</svg>

@@ -1,279 +1,231 @@
+// 7장 — 작은 사각형 고리를 따라 벡터를 평행이동하면 돌아간다. 회전각 ÷ 넓이 = 곡률 K = 1/r².
+// 고리 변은 측지선(대원 호)이라, 넓이는 내각 초과분으로 정확히 계산된다(가우스-보네).
+// 색: 방향 u, v = dir, 벡터 W = field, 회전각 Δθ = holo, K = gauss, R = riem (palette.json).
 import { h, render } from 'preact';
-import { useState, useRef, useCallback } from 'preact/hooks';
+import { useState, useRef } from 'preact/hooks';
 import { useCanvas, usePointer } from './shared/canvas-utils.jsx';
 import { Slider } from './shared/controls.jsx';
 import { useThemeColors } from './shared/theme.jsx';
+import { usePalette, HEX } from './shared/palette.js';
+import { Tex } from './shared/tex.jsx';
 import {
-  sphereToCart, project3D, vecScale, vecAdd, vecSub, vecNormalize, vecDot, vecCross,
-  slerp, drawSphereWireframe, drawArrow, rotationMatrix, matVec3,
+  project3D, vecAdd, vecSub, vecScale, vecDot, vecCross, vecNormalize,
+  slerp, drawArrow,
 } from './shared/math.js';
 
 const TAU = 2 * Math.PI;
+const R_MAX = 1.6;
+// 기준점 p (단위구 위) 와 그 점의 두 방향 u(동쪽), v(북쪽)
+const TH0 = 1.0, PH0 = 0.35;
+const P0 = [Math.sin(TH0) * Math.cos(PH0), Math.sin(TH0) * Math.sin(PH0), Math.cos(TH0)];
+const U0 = [-Math.sin(PH0), Math.cos(PH0), 0];
+const V0 = vecNormalize(vecCross(P0, U0)); // p × u = 북쪽
 
-function parallelTransportArc(vec, from, to, steps = 40) {
-  let v = [...vec];
-  for (let i = 0; i < steps; i++) {
-    const p0 = vecNormalize(slerp(from, to, i / steps));
-    const p1 = vecNormalize(slerp(from, to, (i + 1) / steps));
-    const dot = Math.max(-1, Math.min(1, vecDot(p0, p1)));
-    if (Math.abs(dot - 1) < 1e-12) continue;
-    const axis = vecNormalize(vecCross(p0, p1));
-    const R = rotationMatrix(axis, Math.acos(dot));
-    v = matVec3(R, v);
-    const comp = vecDot(v, p1);
-    v = vecSub(v, vecScale(p1, comp));
-    const n = Math.sqrt(vecDot(v, v));
-    if (n > 1e-12) v = vecScale(v, Math.sqrt(vecDot(vec, vec)) / n);
+// 단위구 위 측지선: p 에서 접벡터 d 방향으로 거리 s
+function expS2(p, d, s) {
+  const n = Math.hypot(...d);
+  if (n < 1e-12) return p;
+  const e = vecScale(d, 1 / n);
+  return vecAdd(vecScale(p, Math.cos(s)), vecScale(e, Math.sin(s)));
+}
+// a → b 대원 호를 따른 평행이동 = 축 a×b 둘레의 회전 (로드리게스, 짧은 호에서도 정확)
+function transport(W, a, b) {
+  const ax = vecCross(a, b);
+  const sn = Math.hypot(...ax), cs = vecDot(a, b);
+  if (sn < 1e-15) return W;
+  const k = vecScale(ax, 1 / sn);
+  return vecAdd(vecAdd(vecScale(W, cs), vecScale(vecCross(k, W), sn)), vecScale(k, vecDot(k, W) * (1 - cs)));
+}
+function tangentTo(x, y) { return vecNormalize(vecSub(y, vecScale(x, vecDot(x, y)))); }
+
+// 고리 계산: 꼭짓점, 평행이동 결과, 부호 있는 회전각, 단위구 넓이
+function loop(s, uFirst) {
+  const A = P0;
+  const B = expS2(P0, U0, s);
+  const C = expS2(P0, vecAdd(U0, V0), s);
+  const D = expS2(P0, V0, s);
+  const path = uFirst ? [A, B, C, D, A] : [A, D, C, B, A];
+  const W0 = vecScale(vecNormalize(vecAdd(U0, vecScale(V0, 0.35))), 1);
+  let W = [...W0];
+  const snaps = [];
+  for (let k = 0; k < 4; k++) {
+    const from = path[k], to = path[k + 1];
+    const n = 24;
+    for (let i = 0; i < n; i++) {
+      const a = vecNormalize(slerp(from, to, i / n));
+      const b = vecNormalize(slerp(from, to, (i + 1) / n));
+      W = transport(W, a, b);
+    }
+    snaps.push({ at: to, W: [...W] });
   }
-  return v;
+  const dTheta = Math.atan2(vecDot(P0, vecCross(W0, W)), vecDot(W0, W));
+  // 내각 합 - 2π = 넓이 (단위구)
+  const quad = [A, B, C, D];
+  let sum = 0;
+  for (let k = 0; k < 4; k++) {
+    const X = quad[k], prev = quad[(k + 3) % 4], next = quad[(k + 1) % 4];
+    sum += Math.acos(Math.max(-1, Math.min(1, vecDot(tangentTo(X, prev), tangentTo(X, next)))));
+  }
+  return { quad, path, W0, W, snaps, dTheta, areaUnit: sum - TAU };
 }
 
 function Ch07Viz() {
   const colors = useThemeColors();
-  const [size, setSize] = useState(0.8);
-  const rot = useRef({ y: -0.3, x: 0.35 });
+  const pal = usePalette();
+  const [eps, setEps] = useState(0.5);
+  const [r, setR] = useState(1.0);
+  const [uFirst, setUFirst] = useState(true);
+  const rot = useRef({ y: -1.92, x: 0.5 }); // 기준점 p 가 정면에 오도록
   const dragRef = useRef(null);
+
+  const s = Math.min(eps / r, 1.2); // 단위구에서의 변 길이(라디안)
+  const L = loop(s, uFirst);
+  const area = L.areaUnit * r * r;
+  const stateRef = useRef(null);
+  stateRef.current = { L, r };
 
   const drawRef = useRef(null);
   drawRef.current = (ctx, w, h) => {
-    const cx = w / 2, cy = h * 0.42;
-    const R = Math.min(w, h) * 0.30;
-    const rotY = rot.current.y, rotX = rot.current.x;
+    const { L, r } = stateRef.current;
+    const cx = w / 2, cy = h / 2;
+    // 화면 속 구의 크기는 고정. 반지름 r 이 커지면 같은 ε 의 고리가 구에서 차지하는 몫이 작아진다.
+    const Rs = Math.min(w, h) * 0.45;
+    const { y: ry, x: rx } = rot.current;
+    // z 축을 화면 위로. (x, z, −y) 로 보내야 오른손 좌표계가 유지되어 반시계가 반시계로 보인다
+    const pr = (q, k = 1) => project3D([q[0] * Rs * k, q[2] * Rs * k, -q[1] * Rs * k], cx, cy, 1, ry, rx);
 
-    const COL_BLUE = colors.accent;
-    const COL_ORANGE = '#FF9800';
-    const COL_GREEN = '#43A047';
-    const COL_RED = '#e53935';
+    ctx.strokeStyle = colors.border; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, Rs, 0, TAU); ctx.stroke();
+    // 위도선·경도선 (회전 반영)
+    function curve3(fn, n, style, width, dash) {
+      ctx.strokeStyle = style; ctx.lineWidth = width; ctx.setLineDash(dash || []);
+      let on = false; ctx.beginPath();
+      for (let i = 0; i <= n; i++) {
+        const q = pr(fn(i / n));
+        if (q.z >= 0) { if (!on) ctx.moveTo(q.x, q.y); else ctx.lineTo(q.x, q.y); on = true; } else on = false;
+      }
+      ctx.stroke(); ctx.setLineDash([]);
+    }
+    ctx.globalAlpha = 0.9;
+    for (const Z of [-0.75, -0.4, 0, 0.4, 0.75]) {
+      const rr = Math.sqrt(1 - Z * Z);
+      curve3(t => [rr * Math.cos(TAU * t), rr * Math.sin(TAU * t), Z], 80, colors.border, 1);
+    }
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI;
+      curve3(t => [Math.cos(a) * Math.sin(TAU * t), Math.sin(a) * Math.sin(TAU * t), Math.cos(TAU * t)], 100, colors.border, 1);
+    }
+    ctx.globalAlpha = 1;
 
-    drawSphereWireframe(ctx, cx, cy, R, rotY, rotX, colors.fgMuted);
+    // 고리 내부
+    const [A, B, C, D] = L.quad;
+    const ring = [[A, B], [B, C], [C, D], [D, A]];
+    ctx.fillStyle = pal.gauss; ctx.globalAlpha = 0.16;
+    ctx.beginPath();
+    ring.forEach(([a, b], k) => {
+      for (let i = 0; i <= 16; i++) {
+        const q = pr(vecNormalize(slerp(a, b, i / 16)));
+        if (k === 0 && i === 0) ctx.moveTo(q.x, q.y); else ctx.lineTo(q.x, q.y);
+      }
+    });
+    ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
 
-    // Parallelogram on sphere centered at (theta0, phi0)
-    const theta0 = 0.8, phi0 = 0.4;
-    const d = size * 0.3;
-
-    const A = sphereToCart(theta0 - d, phi0 - d);
-    const B = sphereToCart(theta0 - d, phi0 + d);
-    const C = sphereToCart(theta0 + d, phi0 + d);
-    const D = sphereToCart(theta0 + d, phi0 - d);
-    const verts = [A, B, C, D];
-
-    // Color-coded edges: A→B (u, blue), B→C (v, orange), C→D (u, blue), D→A (v, orange)
-    const edgeColors = [COL_BLUE, COL_ORANGE, COL_BLUE, COL_ORANGE];
-    for (let e = 0; e < 4; e++) {
-      const v0 = verts[e], v1 = verts[(e + 1) % 4];
-      ctx.strokeStyle = edgeColors[e];
-      ctx.lineWidth = 2.5;
+    // 변: A→B, D→C 는 u 방향, A→D, B→C 는 v 방향
+    const edges = [[A, B, 'u'], [D, C, 'u'], [A, D, 'v'], [B, C, 'v']];
+    for (const [a, b, name] of edges) {
+      ctx.strokeStyle = pal.dir; ctx.lineWidth = 2.5; ctx.setLineDash(name === 'v' ? [6, 4] : []);
       ctx.beginPath();
       for (let i = 0; i <= 20; i++) {
-        const p = vecNormalize(slerp(v0, v1, i / 20));
-        const pp = project3D(vecScale(p, R), cx, cy, 1, rotY, rotX);
-        if (i === 0) ctx.moveTo(pp.x, pp.y); else ctx.lineTo(pp.x, pp.y);
+        const q = pr(vecNormalize(slerp(a, b, i / 20)));
+        if (i === 0) ctx.moveTo(q.x, q.y); else ctx.lineTo(q.x, q.y);
       }
-      ctx.stroke();
+      ctx.stroke(); ctx.setLineDash([]);
     }
+    // u, v 라벨 (첫 두 변 중간 바깥쪽)
+    ctx.font = 'italic bold 15px serif'; ctx.fillStyle = pal.dir;
+    const mu = pr(vecNormalize(slerp(A, B, 0.5)), 1.0);
+    const mv = pr(vecNormalize(slerp(A, D, 0.5)), 1.0);
+    const pa = pr(A);
+    ctx.fillText('u', mu.x + (mu.x - pa.x) * 0.0 + 2, mu.y + 16);
+    ctx.fillText('v', mv.x - 14, mv.y);
 
-    // Fill
-    ctx.fillStyle = 'rgba(33,150,243,0.08)';
-    ctx.beginPath();
-    const steps = 10;
-    for (let i = 0; i <= steps; i++) {
-      const p = vecNormalize(slerp(A, B, i / steps));
-      const pp = project3D(vecScale(p, R), cx, cy, 1, rotY, rotX);
-      if (i === 0) ctx.moveTo(pp.x, pp.y); else ctx.lineTo(pp.x, pp.y);
+    // 도는 방향 화살표 (첫 변 위)
+    const first = L.path[1];
+    const t1 = pr(vecNormalize(slerp(A, first, 0.55))), t2 = pr(vecNormalize(slerp(A, first, 0.75)));
+    ctx.strokeStyle = colors.fg; ctx.lineWidth = 1.5;
+    drawArrow(ctx, t1.x, t1.y, t2.x, t2.y, 7);
+
+    // 각 꼭짓점에서 옮겨진 W (옅게)
+    const wl = 0.28;
+    for (const sn of L.snaps.slice(0, 3)) {
+      const a = pr(sn.at), b = pr(vecAdd(sn.at, vecScale(sn.W, wl)));
+      ctx.strokeStyle = pal.field; ctx.globalAlpha = 0.45; ctx.lineWidth = 2;
+      drawArrow(ctx, a.x, a.y, b.x, b.y, 7);
+      ctx.globalAlpha = 1;
     }
-    for (let i = 0; i <= steps; i++) {
-      const p = vecNormalize(slerp(B, C, i / steps));
-      const pp = project3D(vecScale(p, R), cx, cy, 1, rotY, rotX);
-      ctx.lineTo(pp.x, pp.y);
-    }
-    for (let i = 0; i <= steps; i++) {
-      const p = vecNormalize(slerp(C, D, i / steps));
-      const pp = project3D(vecScale(p, R), cx, cy, 1, rotY, rotX);
-      ctx.lineTo(pp.x, pp.y);
-    }
-    for (let i = 0; i <= steps; i++) {
-      const p = vecNormalize(slerp(D, A, i / steps));
-      const pp = project3D(vecScale(p, R), cx, cy, 1, rotY, rotX);
-      ctx.lineTo(pp.x, pp.y);
-    }
-    ctx.fill();
-
-    // Edge labels
-    const midAB = vecNormalize(slerp(A, B, 0.5));
-    const midBC = vecNormalize(slerp(B, C, 0.5));
-    const ppU = project3D(vecScale(midAB, R * 1.1), cx, cy, 1, rotY, rotX);
-    const ppV = project3D(vecScale(midBC, R * 1.1), cx, cy, 1, rotY, rotX);
-    ctx.font = 'bold 13px sans-serif';
-    ctx.fillStyle = COL_BLUE;
-    ctx.fillText('u', ppU.x + 4, ppU.y - 4);
-    ctx.fillStyle = COL_ORANGE;
-    ctx.fillText('v', ppV.x + 4, ppV.y - 4);
-
-    // Initial vector W at A (green)
-    let initVec = vecSub(B, vecScale(A, vecDot(A, B)));
-    const initLen = Math.sqrt(vecDot(initVec, initVec));
-    if (initLen > 1e-10) initVec = vecScale(initVec, 0.15 / initLen);
-
-    // Transport A→B→C→D→A with 4 leg colors
-    const path = [A, B, C, D, A];
-    let vec = [...initVec];
-    // Leg colors: A→B = blue(u), B→C = orange(v), C→D = blue(u), D→A = orange(v)
-    const trailColors = [COL_BLUE, COL_ORANGE, COL_BLUE, COL_ORANGE];
-
-    for (let leg = 0; leg < 4; leg++) {
-      const from = path[leg], to = path[leg + 1];
-      const startP = project3D(vecScale(from, R), cx, cy, 1, rotY, rotX);
-      const tipP = project3D(vecAdd(vecScale(from, R), vecScale(vec, R)), cx, cy, 1, rotY, rotX);
-      ctx.strokeStyle = leg === 0 ? COL_GREEN : trailColors[leg];
-      ctx.lineWidth = 2;
-      drawArrow(ctx, startP.x, startP.y, tipP.x, tipP.y, 8);
-
-      vec = parallelTransportArc(vec, from, to);
-    }
-
-    // Final vector at A (red — the rotated W)
-    const aScreen = project3D(vecScale(A, R), cx, cy, 1, rotY, rotX);
-    const finalTip = project3D(vecAdd(vecScale(A, R), vecScale(vec, R)), cx, cy, 1, rotY, rotX);
-    ctx.strokeStyle = COL_RED;
+    // 처음 W (점선), 돌아온 W (굵게)
+    const a0 = pr(A);
+    const b0 = pr(vecAdd(A, vecScale(L.W0, wl)));
+    const b1 = pr(vecAdd(A, vecScale(L.W, wl)));
+    ctx.strokeStyle = pal.field; ctx.lineWidth = 1.8; ctx.setLineDash([4, 4]);
+    drawArrow(ctx, a0.x, a0.y, b0.x, b0.y, 8); ctx.setLineDash([]);
     ctx.lineWidth = 3;
-    drawArrow(ctx, aScreen.x, aScreen.y, finalTip.x, finalTip.y, 10);
+    drawArrow(ctx, a0.x, a0.y, b1.x, b1.y, 10);
+    // 회전각 호
+    ctx.strokeStyle = pal.holo; ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i <= 20; i++) {
+      const ang = (i / 20) * L.dTheta;
+      const dir = vecAdd(vecScale(L.W0, Math.cos(ang)), vecScale(vecCross(P0, L.W0), Math.sin(ang)));
+      const q = pr(vecAdd(A, vecScale(dir, wl * 0.72)));
+      if (i === 0) ctx.moveTo(q.x, q.y); else ctx.lineTo(q.x, q.y);
+    }
+    ctx.stroke();
+    ctx.fillStyle = colors.fg;
+    ctx.beginPath(); ctx.arc(a0.x, a0.y, 4, 0, TAU); ctx.fill();
+    ctx.font = 'italic 14px serif'; ctx.fillText('p', a0.x - 14, a0.y + 14);
 
-    // Initial vector (ghost, green dashed)
-    const ghostTip = project3D(vecAdd(vecScale(A, R), vecScale(initVec, R)), cx, cy, 1, rotY, rotX);
-    ctx.strokeStyle = COL_GREEN;
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([4, 4]);
-    drawArrow(ctx, aScreen.x, aScreen.y, ghostTip.x, ghostTip.y, 7);
-    ctx.setLineDash([]);
-
-    // Holonomy angle
-    const dotP = vecDot(vecNormalize(initVec), vecNormalize(vec));
-    const holAngle = Math.acos(Math.max(-1, Math.min(1, dotP)));
-    const area = 4 * d * d; // approximate area of the patch
-
-    // --- Formula panel ---
-    const panelY = h * 0.76;
-    const panelX = 14;
-    const lineH = 20;
-
-    // Colored formula: R(u,v)W = nabla_u nabla_v W - nabla_v nabla_u W
-    ctx.font = 'bold 14px monospace';
-    let xOff = panelX;
-
-    ctx.fillStyle = colors.fg;
-    ctx.fillText('R(', xOff, panelY);
-    xOff += ctx.measureText('R(').width;
-    ctx.fillStyle = COL_BLUE;
-    ctx.fillText('u', xOff, panelY);
-    xOff += ctx.measureText('u').width;
-    ctx.fillStyle = colors.fg;
-    ctx.fillText(',', xOff, panelY);
-    xOff += ctx.measureText(',').width;
-    ctx.fillStyle = COL_ORANGE;
-    ctx.fillText('v', xOff, panelY);
-    xOff += ctx.measureText('v').width;
-    ctx.fillStyle = colors.fg;
-    ctx.fillText(')', xOff, panelY);
-    xOff += ctx.measureText(')').width;
-    ctx.fillStyle = COL_GREEN;
-    ctx.fillText('W', xOff, panelY);
-    xOff += ctx.measureText('W').width;
-    ctx.fillStyle = colors.fg;
-    ctx.fillText(' = \u2207', xOff, panelY);
-    xOff += ctx.measureText(' = \u2207').width;
-    ctx.fillStyle = COL_BLUE;
-    ctx.font = 'bold 11px monospace';
-    ctx.fillText('u', xOff, panelY + 3);
-    xOff += ctx.measureText('u').width;
-    ctx.font = 'bold 14px monospace';
-    ctx.fillStyle = colors.fg;
-    ctx.fillText('\u2207', xOff, panelY);
-    xOff += ctx.measureText('\u2207').width;
-    ctx.fillStyle = COL_ORANGE;
-    ctx.font = 'bold 11px monospace';
-    ctx.fillText('v', xOff, panelY + 3);
-    xOff += ctx.measureText('v').width;
-    ctx.font = 'bold 14px monospace';
-    ctx.fillStyle = COL_GREEN;
-    ctx.fillText('W', xOff, panelY);
-    xOff += ctx.measureText('W').width;
-    ctx.fillStyle = colors.fg;
-    ctx.fillText(' \u2212 \u2207', xOff, panelY);
-    xOff += ctx.measureText(' \u2212 \u2207').width;
-    ctx.fillStyle = COL_ORANGE;
-    ctx.font = 'bold 11px monospace';
-    ctx.fillText('v', xOff, panelY + 3);
-    xOff += ctx.measureText('v').width;
-    ctx.font = 'bold 14px monospace';
-    ctx.fillStyle = colors.fg;
-    ctx.fillText('\u2207', xOff, panelY);
-    xOff += ctx.measureText('\u2207').width;
-    ctx.fillStyle = COL_BLUE;
-    ctx.font = 'bold 11px monospace';
-    ctx.fillText('u', xOff, panelY + 3);
-    xOff += ctx.measureText('u').width;
-    ctx.font = 'bold 14px monospace';
-    ctx.fillStyle = COL_GREEN;
-    ctx.fillText('W', xOff, panelY);
-
-    // Numerical line
-    const y2 = panelY + lineH + 2;
-    ctx.font = '14px monospace';
-    ctx.fillStyle = colors.fg;
-    xOff = panelX;
-    ctx.fillText('\uD68C\uC804\uAC01 \u2248 ', xOff, y2);
-    xOff += ctx.measureText('\uD68C\uC804\uAC01 \u2248 ').width;
-    ctx.fillStyle = COL_BLUE;
-    ctx.fillText('Area', xOff, y2);
-    xOff += ctx.measureText('Area').width;
-    ctx.fillStyle = colors.fg;
-    ctx.fillText(' \u00D7 K = ', xOff, y2);
-    xOff += ctx.measureText(' \u00D7 K = ').width;
-    ctx.fillStyle = COL_BLUE;
-    ctx.fillText(area.toFixed(3), xOff, y2);
-    xOff += ctx.measureText(area.toFixed(3)).width;
-    ctx.fillStyle = colors.fg;
-    ctx.fillText(' \u00D7 1.00 = ', xOff, y2);
-    xOff += ctx.measureText(' \u00D7 1.00 = ').width;
-    ctx.fillStyle = COL_RED;
-    ctx.fillText(holAngle.toFixed(3) + ' rad', xOff, y2);
-
-    // Legend
-    const y3 = y2 + lineH;
-    ctx.font = '12px monospace';
-    ctx.fillStyle = COL_GREEN;
-    ctx.fillText('\u25CF W(\uCD08\uAE30)', panelX, y3);
-    ctx.fillStyle = COL_RED;
-    ctx.fillText('\u25CF W(\uD68C\uC804)', panelX + 70, y3);
-    ctx.fillStyle = COL_BLUE;
-    ctx.fillText('\u2500 u\uBC29\uD5A5', panelX + 148, y3);
-    ctx.fillStyle = COL_ORANGE;
-    ctx.fillText('\u2500 v\uBC29\uD5A5', panelX + 218, y3);
-
-    ctx.fillStyle = colors.fgMuted;
-    ctx.font = '12px sans-serif';
-    ctx.fillText('\uB4DC\uB798\uADF8\uD558\uC5EC \uD68C\uC804', panelX, h - 10);
+    ctx.fillStyle = colors.fgMuted; ctx.font = '12px sans-serif';
+    ctx.fillText('끌어서 회전', 10, h - 10);
   };
 
   const canvasRef = useCanvas(drawRef);
-
   usePointer(canvasRef, {
     onDown: (pos) => { dragRef.current = { mx: pos.x, my: pos.y, ry: rot.current.y, rx: rot.current.x }; },
     onDrag: (pos) => {
-      if (!dragRef.current) return;
-      rot.current = {
-        y: dragRef.current.ry + (pos.x - dragRef.current.mx) * 0.01,
-        x: dragRef.current.rx - (pos.y - dragRef.current.my) * 0.01,
-      };
+      const d = dragRef.current; if (!d) return;
+      rot.current = { y: d.ry + (pos.x - d.mx) * 0.01, x: Math.max(-1.4, Math.min(1.4, d.rx + (pos.y - d.my) * 0.01)) };
     },
     onUp: () => { dragRef.current = null; },
   });
 
+  const Hh = HEX;
+  const K = 1 / (r * r);
+  const ratio = Math.abs(L.dTheta) / area;
+  const Rt = `\\textcolor{${Hh.riem}}{R}`;
+  const u = `\\textcolor{${Hh.dir}}{u}`, v = `\\textcolor{${Hh.dir}}{v}`, W = `\\textcolor{${Hh.field}}{W}`;
+  const dT = `\\textcolor{${Hh.holo}}{\\Delta\\theta}`, Kt = `\\textcolor{${Hh.gauss}}{K}`;
+
   return (
     <div class="viz-inner">
+      <div class="viz-message">
+        고리를 한 바퀴 돌면 <Tex>{W}</Tex> 가 <Tex>{dT}</Tex> 만큼 돌아간다. 고리 크기를 바꿔도 <Tex>{`${dT} \\div \\text{넓이}`}</Tex> 는 늘 <Tex>{`1/r^2`}</Tex> — 그것이 곡률이다. 도는 순서를 바꾸면 회전 방향이 뒤집힌다.
+      </div>
       <canvas ref={canvasRef} />
+      <div class="viz-formula">
+        <div><Tex>{`${dT} = ${L.dTheta >= 0 ? '+' : '-'}${Math.abs(L.dTheta).toFixed(4)}\\ \\text{rad}`}</Tex>
+          <span style={{ color: 'var(--fg-muted)', marginLeft: '0.6em', fontSize: '0.9em' }}>
+            ({uFirst ? '반시계, u 먼저' : '시계, v 먼저'})</span></div>
+        <div><Tex>{`\\text{넓이} = ${area.toFixed(4)}, \\qquad \\epsilon^2 = ${(eps * eps).toFixed(4)}`}</Tex></div>
+        <div><Tex>{`\\frac{|${dT}|}{\\text{넓이}} = ${ratio.toFixed(4)} \\qquad ${Kt} = \\frac{1}{r^2} = ${K.toFixed(4)}`}</Tex></div>
+        <div><Tex>{`${Rt}(${uFirst ? u : v}, ${uFirst ? v : u})${W} = -${Rt}(${uFirst ? v : u}, ${uFirst ? u : v})${W}`}</Tex>
+          <span style={{ color: 'var(--fg-muted)', marginLeft: '0.6em', fontSize: '0.9em' }}>순서를 바꾸면 부호가 바뀐다</span></div>
+      </div>
       <div class="viz-controls">
-        <Slider label="평행사변형 크기" min={0.2} max={1.5} step={0.01} value={size} onChange={setSize} />
+        <Slider label={<span>고리 한 변 <Tex>{'\\epsilon'}</Tex></span>} min={0.1} max={1.0} step={0.01} value={eps} onChange={setEps} />
+        <Slider label={<span>구의 반지름 <Tex>{'r'}</Tex></span>} min={0.6} max={R_MAX} step={0.01} value={r} onChange={setR} />
+        <button class={'viz-btn' + (uFirst ? ' active' : '')} onClick={() => setUFirst(true)}>u 먼저</button>
+        <button class={'viz-btn' + (!uFirst ? ' active' : '')} onClick={() => setUFirst(false)}>v 먼저</button>
       </div>
     </div>
   );

@@ -4,20 +4,16 @@
 빌드 결과를 lameproof.com (imchkkim.github.io) 에 배포한다.
 
 ## 주의사항
-- Node.js는 한글 경로에서 segfault 발생 가능 → 반드시 `/tmp/diffgeo-build/`에서 빌드
+- 빌드는 **저장소 루트에서** 한다. build.cjs 가 `viz/shared/recolor.js`(색 SSOT)를 상대 경로로 읽으므로 /tmp 복사본으로는 안 된다. (node v24 에서 한글 경로 segfault 재현 안 됨, 2026-09-25 확인)
 - `gh` CLI 없음 → 직접 git 명령 사용
 
 ## 배포 절차
 
 ### 1. 빌드
 ```bash
-# 의존성이 없으면 먼저 설치
-cd /tmp/diffgeo-build && npm ls katex 2>/dev/null || npm install katex markdown-it@13 markdown-it-texmath
-
-# 빌드 스크립트 복사 및 실행
-cp /home/hakkyu/diffgeo-book/build.cjs /tmp/diffgeo-build/build.cjs
-node build.cjs /home/hakkyu/diffgeo-book
+cd /home/hakkyu/diffgeo-book && npm run build
 ```
+출력에 `katex-error` 가 없는지: `grep -l katex-error dist/*.html` 이 비어 있어야 한다.
 
 ### 2. 배포 레포 준비
 ```bash

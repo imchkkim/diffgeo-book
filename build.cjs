@@ -4,6 +4,7 @@ const markdownit = require("markdown-it");
 const texmath = require("markdown-it-texmath");
 const katex = require("katex");
 const esbuild = require("esbuild");
+const { recolorKatex, paletteCss } = require("./viz/shared/recolor.js");
 
 // Source dir (manuscript) and dist dir passed as arguments or defaults
 const SRC = process.argv[2] || path.dirname(__filename);
@@ -71,10 +72,7 @@ for (const f of fs.readdirSync(katexFontsSrc)) {
 const imgSrc = path.join(SRC, "images");
 const imgDst = path.join(DIST, "images");
 if (fs.existsSync(imgSrc)) {
-  fs.mkdirSync(imgDst, { recursive: true });
-  for (const f of fs.readdirSync(imgSrc)) {
-    fs.copyFileSync(path.join(imgSrc, f), path.join(imgDst, f));
-  }
+  fs.cpSync(imgSrc, imgDst, { recursive: true });
 }
 
 // Compile viz JSX bundles
@@ -84,28 +82,52 @@ const vizBundles = new Set();
 if (fs.existsSync(vizSrc)) {
   const vizFiles = fs.readdirSync(vizSrc).filter(f => f.startsWith("ch") && f.endsWith(".jsx"));
   if (vizFiles.length > 0) {
+    fs.rmSync(vizDst, { recursive: true, force: true });
     fs.mkdirSync(vizDst, { recursive: true });
+    // splitting: preact·katex·shared 를 공통 청크로 한 번만 받게 한다
+    esbuild.buildSync({
+      entryPoints: vizFiles.map(vf => path.join(vizSrc, vf)),
+      outdir: vizDst,
+      bundle: true,
+      splitting: true,
+      minify: true,
+      format: "esm",
+      jsx: "automatic",
+      jsxImportSource: "preact",
+      target: ["es2020"],
+      nodePaths: [path.join(SRC, "node_modules")],
+    });
     for (const vf of vizFiles) {
-      const outName = vf.replace(".jsx", ".js");
-      esbuild.buildSync({
-        entryPoints: [path.join(vizSrc, vf)],
-        outfile: path.join(vizDst, outName),
-        bundle: true,
-        minify: true,
-        format: "esm",
-        jsx: "automatic",
-        jsxImportSource: "preact",
-        target: ["es2020"],
-        nodePaths: [path.join(SRC, "node_modules")],
-      });
-      vizBundles.add(outName.replace(".js", ""));
-      console.log("  viz:", vf, "->", outName);
+      vizBundles.add(vf.replace(".jsx", ""));
+      console.log("  viz:", vf);
     }
   }
 }
 
 // Read our CSS
-const appCss = fs.readFileSync(path.join(SRC, "style.css"), "utf-8");
+const appCss = fs.readFileSync(path.join(SRC, "style.css"), "utf-8") + "\n" + paletteCss();
+
+// ── 대화: "**김민준 〔M04〕:** …" 문단을 말풍선 차례로 바꾼다 ──
+// 〔인덱스〕가 있는 차례에만 인물 이미지 자리(images/cast/<인덱스>.png)를 둔다. 파일이 없으면 빈 자리 표시.
+const SPEAKERS = { "선생님": "T", "김민준": "M", "이서연": "S" };
+const CAST_EXT = [".png", ".webp", ".jpg", ".svg"];
+function castFigure(idx, who) {
+  const ext = CAST_EXT.find(e => fs.existsSync(path.join(SRC, "images", "cast", idx + e)));
+  const inner = ext
+    ? `<img src="images/cast/${idx}${ext}" alt="${who} ${idx}">`
+    : `<span class="cast-slot">${who === "선생님" ? "선생님" : who.slice(1)}<small>${idx}</small></span>`;
+  return `<figure class="cast" data-cast="${idx}">${inner}</figure>`;
+}
+function renderDialogue(html) {
+  return html.replace(
+    /<p><strong>(선생님|김민준|이서연)(?:\s*〔([TMS]\d{2})〕)?\s*[:：]<\/strong>\s*([\s\S]*?)<\/p>/g,
+    (m, who, idx, body) => {
+      const k = SPEAKERS[who];
+      const fig = idx ? castFigure(idx, who) : "";
+      return `<div class="turn turn-${k}${idx ? " has-cast" : ""}">${fig}<div class="turn-body"><p><span class="speaker">${who}</span>${body}</p></div></div>`;
+    }
+  );
+}
 
 // ── Parse all chapters ──
 const chapterData = [];
@@ -116,7 +138,7 @@ for (const file of chapters) {
     continue;
   }
   const raw = fs.readFileSync(filePath, "utf-8");
-  const html = md.render(raw);
+  const html = renderDialogue(recolorKatex(md.render(raw)));
   const slug = file.replace(/\.md$/, "").replace(/ /g, "-");
   const headingMatch = raw.match(/^#{1,2}\s+(.+)$/m);
   const title = headingMatch ? headingMatch[1] : slug;

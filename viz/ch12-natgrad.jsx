@@ -1,316 +1,224 @@
+// 12장 — 정규분포 N(μ, σ²) 를 평균 2, 분산 1인 데이터에 맞추기.
+// 왼쪽 (μ, σ) 좌표, 오른쪽 (μ, log σ) 좌표. 같은 손실 L 의 등고선 위에
+// 보통 경사(σ 좌표), 보통 경사(log σ 좌표), 자연 경사의 흐름선을 양쪽에 함께 그린다.
+// 색: 좌표 = coord, 손실 L = loss, 피셔 계량·자연 경사 = metric (palette.json).
 import { h, render } from 'preact';
-import { useState, useEffect, useRef } from 'preact/hooks';
-import { useCanvas } from './shared/canvas-utils.jsx';
+import { useState, useRef } from 'preact/hooks';
+import { useCanvas, usePointer } from './shared/canvas-utils.jsx';
 import { useThemeColors } from './shared/theme.jsx';
+import { usePalette, HEX } from './shared/palette.js';
+import { Tex } from './shared/tex.jsx';
 
 const TAU = 2 * Math.PI;
+const M = 2, VAR = 1;                    // 데이터의 평균과 분산
+const MU = [-1.5, 3.5];
+const SIG = [0.15, 2.6];
+const LS = [Math.log(SIG[0]), Math.log(SIG[1])];
 
-// Loss landscape: Rosenbrock-like but with anisotropy
-function loss(x, y) {
-  return 2 * (1 - x) * (1 - x) + 10 * (y - x * x) * (y - x * x);
-}
+const loss = (mu, s) => Math.log(s) + (VAR + (mu - M) ** 2) / (2 * s * s);
+// σ 좌표의 그래디언트
+const gradSig = (mu, s) => [(mu - M) / (s * s), 1 / s - (VAR + (mu - M) ** 2) / s ** 3];
+// log σ 좌표의 그래디언트 (∂L/∂(log σ) = σ ∂L/∂σ)
+const gradLog = (mu, s) => { const g = gradSig(mu, s); return [g[0], s * g[1]]; };
+// 자연 경사: F = diag(1/σ², 2/σ²) (σ 좌표), F = diag(1/σ², 2) (log σ 좌표)
+const natSig = (mu, s) => { const g = gradSig(mu, s); return [s * s * g[0], (s * s / 2) * g[1]]; };
+const natLog = (mu, s) => { const g = gradLog(mu, s); return [s * s * g[0], g[1] / 2]; };
 
-function gradLoss(x, y) {
-  return [
-    -4 * (1 - x) - 40 * x * (y - x * x),
-    20 * (y - x * x),
-  ];
-}
-
-// Fisher information matrix (Gauss-Newton Hessian approximation)
-// For a least-squares loss L = Σ r_i², F ≈ J^T J (always positive semi-definite)
-// This is the standard approximation used in practice (Gauss-Newton / Fisher)
-function fisher(x, y) {
-  // Rosenbrock-like: L = 2(1-x)² + 10(y-x²)²
-  // Residuals: r1 = √2·(1-x), r2 = √10·(y-x²)
-  // Jacobian: dr1/dx = -√2, dr1/dy = 0
-  //           dr2/dx = -2√10·x, dr2/dy = √10
-  const jr1x = -Math.SQRT2;
-  const jr1y = 0;
-  const jr2x = -2 * Math.sqrt(10) * x;
-  const jr2y = Math.sqrt(10);
-
-  // F = J^T J (guaranteed positive semi-definite)
-  const fxx = jr1x * jr1x + jr2x * jr2x;
-  const fxy = jr1x * jr1y + jr2x * jr2y;
-  const fyy = jr1y * jr1y + jr2y * jr2y;
-
-  // Add small regularization for numerical stability
-  const reg = 0.5;
-  return [fxx + reg, fxy, fxy, fyy + reg];
-}
-
-function invMat2(m) {
-  const [a, b, c, d] = m;
-  const det = a * d - b * c;
-  if (Math.abs(det) < 1e-10) return [1, 0, 0, 1];
-  return [d / det, -b / det, -c / det, a / det];
-}
-
-function matVec2(m, v) {
-  return [m[0] * v[0] + m[1] * v[1], m[2] * v[0] + m[3] * v[1]];
-}
-
-function simulateTrajectory(x0, y0, useNatural, maxSteps = 500) {
-  const path = [[x0, y0]];
-  let x = x0, y = y0;
-  // Same step size budget: each step moves at most `stepSize` in the relevant norm
-  const stepSize = 0.05;
-  for (let i = 0; i < maxSteps; i++) {
-    const g = gradLoss(x, y);
-    let dx, dy;
-    if (useNatural) {
-      const F = fisher(x, y);
-      const Finv = invMat2(F);
-      [dx, dy] = matVec2(Finv, g);
-    } else {
-      [dx, dy] = g;
-    }
-    const norm = Math.sqrt(dx * dx + dy * dy);
-    if (norm < 1e-8) break;
-    // Normalize direction, then take fixed step
-    const scale = stepSize / norm;
-    x -= scale * dx;
-    y -= scale * dy;
-    if (x < -2 || x > 3 || y < -1.5 || y > 4) break;
-    path.push([x, y]);
-    if (loss(x, y) < 0.001) break;
+// 흐름선: 각자의 좌표에서 정해진 길이만큼씩 방향을 따라 내려간다 (곡선 모양만 비교)
+function flow(mu, s, kind) {
+  const path = [[mu, s]];
+  const H = 0.01;
+  let a = mu, b = kind === 'sig' || kind === 'natSig' ? s : Math.log(s);
+  for (let i = 0; i < 2500; i++) {
+    const sig = kind === 'sig' || kind === 'natSig' ? b : Math.exp(b);
+    const d = kind === 'sig' ? gradSig(a, sig) : kind === 'log' ? gradLog(a, sig)
+      : kind === 'natSig' ? natSig(a, sig) : natLog(a, sig);
+    const n = Math.hypot(d[0], d[1]);
+    if (n < 1e-6) break;
+    a -= H * d[0] / n; b -= H * d[1] / n;
+    const s2 = kind === 'sig' || kind === 'natSig' ? b : Math.exp(b);
+    if (s2 < 0.02 || a < MU[0] - 1 || a > MU[1] + 1 || s2 > 6) break;
+    path.push([a, s2]);
+    if (Math.hypot(a - M, s2 - 1) < 0.01) break;
   }
   return path;
 }
 
-const COL_STD = '#e53935';
-const COL_NAT = '#2196F3';
-const COL_GREEN = '#43A047';
+function panels(w, h) {
+  const gap = 18, top = 26, bottom = 30;
+  const pw = (w - gap * 3) / 2, ph = h - top - bottom;
+  return [
+    { x: gap, y: top, w: pw, h: ph, log: false },
+    { x: gap * 2 + pw, y: top, w: pw, h: ph, log: true },
+  ];
+}
+const yOf = (P, s) => P.log ? (Math.log(s) - LS[0]) / (LS[1] - LS[0]) : (s - SIG[0]) / (SIG[1] - SIG[0]);
+const toScr = (P, mu, s) => [P.x + (mu - MU[0]) / (MU[1] - MU[0]) * P.w, P.y + P.h - yOf(P, s) * P.h];
+function fromScr(P, x, y) {
+  const mu = MU[0] + (x - P.x) / P.w * (MU[1] - MU[0]);
+  const t = (P.y + P.h - y) / P.h;
+  const s = P.log ? Math.exp(LS[0] + t * (LS[1] - LS[0])) : SIG[0] + t * (SIG[1] - SIG[0]);
+  return [Math.min(MU[1], Math.max(MU[0], mu)), Math.min(SIG[1], Math.max(SIG[0], s))];
+}
 
 function Ch12Viz() {
   const colors = useThemeColors();
-  const [startX, setStartX] = useState(-0.5);
-  const [startY, setStartY] = useState(2.5);
+  const pal = usePalette();
+  const start = useRef([-1, 2.2]);
+  const [read, setRead] = useState(start.current);
+  const pending = useRef(false);
+  const cache = useRef({ key: '', img: null });
 
-  const drawRef = useRef(null);
-  drawRef.current = (ctx, w, h) => {
-    const xRange = [-1.5, 2.5], yRange = [-0.5, 3.5];
-    const plotW = w, plotH = h;
+  function setStart(v) {
+    start.current = v;
+    if (pending.current) return;
+    pending.current = true;
+    requestAnimationFrame(() => { pending.current = false; setRead(start.current); });
+  }
 
-    function toScreen(px, py) {
-      return {
-        x: (px - xRange[0]) / (xRange[1] - xRange[0]) * plotW,
-        y: plotH - (py - yRange[0]) / (yRange[1] - yRange[0]) * plotH,
-      };
-    }
-
-    // Draw contour lines
-    const levels = [0.1, 0.5, 1, 2, 5, 10, 20, 50, 100, 200];
-    const resolution = 2;
-
-    for (const level of levels) {
-      ctx.strokeStyle = colors.border;
-      ctx.lineWidth = 0.8;
-      ctx.globalAlpha = 0.5;
-
-      for (let px = 0; px < plotW; px += resolution) {
-        for (let py = 0; py < plotH; py += resolution) {
-          const x0 = xRange[0] + (px / plotW) * (xRange[1] - xRange[0]);
-          const y0 = yRange[0] + (1 - py / plotH) * (yRange[1] - yRange[0]);
-          const x1 = x0 + (resolution / plotW) * (xRange[1] - xRange[0]);
-
-          const v0 = loss(x0, y0);
-          const v1 = loss(x1, y0);
-          const v2 = loss(x0, y0 - (resolution / plotH) * (yRange[1] - yRange[0]));
-
-          if ((v0 - level) * (v1 - level) < 0 || (v0 - level) * (v2 - level) < 0) {
-            ctx.fillStyle = colors.border;
-            ctx.fillRect(px, py, 1, 1);
+  // 등고선은 크기·테마가 바뀔 때만 다시 그린다
+  function contours(ctx, w, h, Ps) {
+    const dpr = window.devicePixelRatio || 1;
+    const key = [w, h, dpr, colors.fgMuted, colors.bg].join('|');
+    if (cache.current.key !== key) {
+      const off = document.createElement('canvas');
+      off.width = w * dpr; off.height = h * dpr;
+      const oc = off.getContext('2d');
+      oc.scale(dpr, dpr);
+      const levels = [];
+      for (let k = 0; k < 16; k++) levels.push(0.42 + 0.14 * k * k / 3);
+      for (const P of Ps) {
+        const step = 2;
+        for (let px = 0; px < P.w; px += step) {
+          for (let py = 0; py < P.h; py += step) {
+            const [mu, s] = fromScr(P, P.x + px + step / 2, P.y + py + step / 2);
+            const L = loss(mu, s);
+            let band = 0;
+            while (band < levels.length && L > levels[band]) band++;
+            if (band % 2 === 1) {
+              oc.fillStyle = colors.fgMuted; oc.globalAlpha = 0.07;
+              oc.fillRect(P.x + px, P.y + py, step, step);
+            }
           }
         }
       }
+      oc.globalAlpha = 1;
+      cache.current = { key, img: off };
     }
-    ctx.globalAlpha = 1;
+    ctx.drawImage(cache.current.img, 0, 0, w, h);
+  }
 
-    // Minimum point
-    const minP = toScreen(1, 1);
-    ctx.fillStyle = COL_GREEN;
-    ctx.beginPath();
-    ctx.arc(minP.x, minP.y, 5, 0, TAU);
-    ctx.fill();
-    ctx.fillStyle = colors.fg;
-    ctx.font = '12px sans-serif';
-    ctx.fillText('\uCD5C\uC19F\uAC12 (1,1)', minP.x + 8, minP.y + 4);
+  const drawRef = useRef(null);
+  drawRef.current = (ctx, w, h) => {
+    const Ps = panels(w, h);
+    for (const P of Ps) { ctx.fillStyle = colors.bg; ctx.fillRect(P.x, P.y, P.w, P.h); }
+    contours(ctx, w, h, Ps);
+    const [mu0, s0] = start.current;
+    const paths = {
+      sig: flow(mu0, s0, 'sig'), log: flow(mu0, s0, 'log'),
+      natSig: flow(mu0, s0, 'natSig'), natLog: flow(mu0, s0, 'natLog'),
+    };
 
-    // Simulate both trajectories
-    const stdPath = simulateTrajectory(startX, startY, false);
-    const natPath = simulateTrajectory(startX, startY, true);
+    for (const P of Ps) {
+      ctx.save();
+      ctx.beginPath(); ctx.rect(P.x, P.y, P.w, P.h); ctx.clip();
+      function line(path, style, width, dash) {
+        ctx.strokeStyle = style; ctx.lineWidth = width; ctx.setLineDash(dash || []);
+        ctx.beginPath();
+        path.forEach(([m, s], i) => { const [x, y] = toScr(P, m, s); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
+        ctx.stroke(); ctx.setLineDash([]);
+      }
+      line(paths.sig, colors.fg, 1.6);
+      line(paths.log, colors.fgMuted, 1.8, [6, 4]);
+      line(paths.natSig, pal.metric, 4);
+      line(paths.natLog, colors.bg, 1.2, [2, 4]); // log σ 좌표로 계산한 자연 경사: 굵은 선 위의 흰 점선
 
-    // Draw standard gradient path
-    ctx.strokeStyle = COL_STD;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    for (let i = 0; i < stdPath.length; i++) {
-      const pt = toScreen(stdPath[i][0], stdPath[i][1]);
-      if (i === 0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y);
+      // 최솟값과 출발점
+      const [xm, ym] = toScr(P, M, 1);
+      ctx.fillStyle = pal.loss;
+      ctx.beginPath(); ctx.arc(xm, ym, 5, 0, TAU); ctx.fill();
+      const [xs, ys] = toScr(P, mu0, s0);
+      ctx.fillStyle = colors.fg;
+      ctx.beginPath(); ctx.arc(xs, ys, 6, 0, TAU); ctx.fill();
+      ctx.strokeStyle = colors.bg; ctx.lineWidth = 2; ctx.stroke();
+      ctx.restore();
+
+      ctx.strokeStyle = colors.border; ctx.lineWidth = 1;
+      ctx.strokeRect(P.x, P.y, P.w, P.h);
+      // 축 이름
+      ctx.fillStyle = pal.coord; ctx.font = 'italic 14px serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('μ', P.x + P.w / 2, P.y + P.h + 20);
+      ctx.textAlign = 'left';
+      ctx.fillText(P.log ? 'log σ' : 'σ', P.x + 4, P.y - 8);
+      ctx.fillStyle = colors.fgMuted; ctx.font = '12px sans-serif';
+      ctx.fillText(P.log ? '좌표 (μ, log σ)' : '좌표 (μ, σ)', P.x + 44, P.y - 8);
+      // 눈금
+      ctx.font = '10px sans-serif';
+      for (const s of [0.25, 0.5, 1, 2]) {
+        const [, y] = toScr(P, MU[0], s);
+        ctx.fillText(String(s), P.x + 3, y + 3);
+        ctx.strokeStyle = colors.border; ctx.beginPath(); ctx.moveTo(P.x + 22, y); ctx.lineTo(P.x + 30, y); ctx.stroke();
+      }
     }
-    ctx.stroke();
-
-    // Draw natural gradient path
-    ctx.strokeStyle = COL_NAT;
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    for (let i = 0; i < natPath.length; i++) {
-      const pt = toScreen(natPath[i][0], natPath[i][1]);
-      if (i === 0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y);
-    }
-    ctx.stroke();
-
-    // --- Draw gradient vectors at start point ---
-    const sp = toScreen(startX, startY);
-    const g = gradLoss(startX, startY);
-    const F = fisher(startX, startY);
-    const Finv = invMat2(F);
-    const ng = matVec2(Finv, g);
-
-    // Normalize for display (scale to reasonable arrow length)
-    const gNorm = Math.sqrt(g[0] * g[0] + g[1] * g[1]);
-    const ngNorm = Math.sqrt(ng[0] * ng[0] + ng[1] * ng[1]);
-    const arrowLen = 40;
-
-    // Standard gradient arrow (red)
-    if (gNorm > 1e-6) {
-      const gScale = arrowLen / gNorm;
-      const gx = sp.x - g[0] * gScale;
-      const gy = sp.y + g[1] * gScale; // flip y for screen coords
-      ctx.strokeStyle = COL_STD;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.moveTo(sp.x, sp.y);
-      ctx.lineTo(gx, gy);
-      ctx.stroke();
-      // Arrowhead
-      const angle = Math.atan2(gy - sp.y, gx - sp.x);
-      ctx.beginPath();
-      ctx.moveTo(gx, gy);
-      ctx.lineTo(gx - 8 * Math.cos(angle - 0.4), gy - 8 * Math.sin(angle - 0.4));
-      ctx.lineTo(gx - 8 * Math.cos(angle + 0.4), gy - 8 * Math.sin(angle + 0.4));
-      ctx.closePath();
-      ctx.fillStyle = COL_STD;
-      ctx.fill();
-    }
-
-    // Natural gradient arrow (blue)
-    if (ngNorm > 1e-6) {
-      const ngScale = arrowLen / ngNorm;
-      const ngx = sp.x - ng[0] * ngScale;
-      const ngy = sp.y + ng[1] * ngScale;
-      ctx.strokeStyle = COL_NAT;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.moveTo(sp.x, sp.y);
-      ctx.lineTo(ngx, ngy);
-      ctx.stroke();
-      // Arrowhead
-      const angle = Math.atan2(ngy - sp.y, ngx - sp.x);
-      ctx.beginPath();
-      ctx.moveTo(ngx, ngy);
-      ctx.lineTo(ngx - 8 * Math.cos(angle - 0.4), ngy - 8 * Math.sin(angle - 0.4));
-      ctx.lineTo(ngx - 8 * Math.cos(angle + 0.4), ngy - 8 * Math.sin(angle + 0.4));
-      ctx.closePath();
-      ctx.fillStyle = COL_NAT;
-      ctx.fill();
-    }
-
-    // Start point (on top of arrows)
-    ctx.fillStyle = colors.fg;
-    ctx.beginPath();
-    ctx.arc(sp.x, sp.y, 6, 0, TAU);
-    ctx.fill();
-
-    // End dots
-    if (stdPath.length > 1) {
-      const ep = toScreen(stdPath[stdPath.length - 1][0], stdPath[stdPath.length - 1][1]);
-      ctx.fillStyle = COL_STD;
-      ctx.beginPath(); ctx.arc(ep.x, ep.y, 4, 0, TAU); ctx.fill();
-    }
-    if (natPath.length > 1) {
-      const ep = toScreen(natPath[natPath.length - 1][0], natPath[natPath.length - 1][1]);
-      ctx.fillStyle = COL_NAT;
-      ctx.beginPath(); ctx.arc(ep.x, ep.y, 4, 0, TAU); ctx.fill();
-    }
-
-    // --- Formula panel (top-left) ---
-    // Semi-transparent background for readability
-    ctx.fillStyle = colors.bg || '#ffffff';
-    ctx.globalAlpha = 0.85;
-    ctx.fillRect(4, 4, 310, 108);
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = colors.border;
-    ctx.lineWidth = 0.5;
-    ctx.strokeRect(4, 4, 310, 108);
-
-    ctx.textAlign = 'left';
-
-    // Formula title
-    ctx.font = 'bold 13px sans-serif';
-    ctx.fillStyle = colors.fg;
-    ctx.fillText('\u00F1\u2207L = F\u207B\u00B9 \u2207L', 12, 22);
-
-    // Gradient vectors with actual values
-    ctx.font = '12px monospace';
-    ctx.fillStyle = COL_STD;
-    ctx.fillText(`\u2207L = (${g[0].toFixed(2)}, ${g[1].toFixed(2)})`, 12, 40);
-
-    // Fisher matrix
-    ctx.fillStyle = colors.fgMuted;
-    ctx.font = '11px monospace';
-    ctx.fillText(`F = [[${F[0].toFixed(1)}, ${F[1].toFixed(1)}], [${F[2].toFixed(1)}, ${F[3].toFixed(1)}]]`, 12, 56);
-
-    // Natural gradient
-    ctx.fillStyle = COL_NAT;
-    ctx.font = '12px monospace';
-    ctx.fillText(`F\u207B\u00B9\u2207L = (${ng[0].toFixed(2)}, ${ng[1].toFixed(2)})`, 12, 72);
-
-    // Step counts
-    ctx.font = 'bold 12px sans-serif';
-    ctx.fillStyle = COL_STD;
-    ctx.fillText(`\uBCF4\uD1B5 \uACBD\uC0AC: ${stdPath.length} \uC2A4\uD15D`, 12, 90);
-    ctx.fillStyle = COL_NAT;
-    ctx.fillText(`\uC790\uC5F0 \uACBD\uC0AC: ${natPath.length} \uC2A4\uD15D`, 160, 90);
-
-    // F != I note
-    ctx.fillStyle = colors.fgMuted;
-    ctx.font = '11px sans-serif';
-    ctx.fillText('F \u2260 I \u2192 \uB9E4\uAC1C\uBCC0\uC218 \uACF5\uAC04\uC774 \uD718\uC5B4\uC838 \uBC29\uD5A5\uC774 \uB2E4\uB984', 12, 106);
-
-    // Bottom instruction
-    ctx.fillStyle = colors.fgMuted;
-    ctx.font = '12px sans-serif';
-    ctx.fillText('\uD074\uB9AD\uD558\uC5EC \uC2DC\uC791\uC810 \uBCC0\uACBD', 12, h - 10);
   };
 
   const canvasRef = useCanvas(drawRef);
 
-  // Click to set start point
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    function onClick(e) {
-      const rect = canvas.getBoundingClientRect();
-      const px = e.clientX - rect.left;
-      const py = e.clientY - rect.top;
-      const x = -1.5 + (px / rect.width) * 4;
-      const y = -0.5 + (1 - py / rect.height) * 4;
-      setStartX(x);
-      setStartY(y);
-    }
-    canvas.addEventListener('click', onClick);
-    return () => canvas.removeEventListener('click', onClick);
-  }, [canvasRef.current]);
+  function pick(pos) {
+    const cv = canvasRef.current;
+    const Ps = panels(cv.clientWidth, cv.clientHeight);
+    const P = Ps.find(P => pos.x >= P.x && pos.x <= P.x + P.w && pos.y >= P.y && pos.y <= P.y + P.h);
+    if (P) setStart(fromScr(P, pos.x, pos.y));
+  }
+  usePointer(canvasRef, { onDown: pick, onDrag: pick });
+
+  // ── 수식 패널 ──
+  const C = HEX.coord, Lc = HEX.loss, G = HEX.metric;
+  const [mu, s] = read;
+  const g = gradSig(mu, s), gl = gradLog(mu, s), n = natSig(mu, s), nl = natLog(mu, s);
+  const f = v => v.toFixed(2);
+  const pair = v => `(${f(v[0])},\\ ${f(v[1])})`;
+  const legend = (style, text) => (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35em', marginRight: '1em' }}>
+      <span style={{ display: 'inline-block', width: '22px', height: 0, borderTop: style }} />{text}
+    </span>
+  );
 
   return (
     <div class="viz-inner">
+      <div class="viz-message">
+        보통 경사하강은 좌표를 <Tex>{`\\textcolor{${C}}{\\sigma}`}</Tex>에서 <Tex>{`\\log\\textcolor{${C}}{\\sigma}`}</Tex>로 바꾸면 다른 길로 가지만, 자연 경사의 길은 어느 좌표로 계산해도 같은 길이다.
+      </div>
       <canvas ref={canvasRef} />
+      <div class="viz-formula">
+        <div>
+          <Tex>{`(\\textcolor{${C}}{\\mu}, \\textcolor{${C}}{\\sigma}) = (${f(mu)},\\ ${f(s)}),\\quad \\textcolor{${Lc}}{L} = ${loss(mu, s).toFixed(3)}`}</Tex>
+        </div>
+        <div>
+          <Tex>{`\\sigma\\text{ 좌표: }\\ \\nabla\\textcolor{${Lc}}{L} = ${pair(g)},\\ \\ \\textcolor{${G}}{F} = \\mathrm{diag}(${f(1 / (s * s))},\\ ${f(2 / (s * s))})`}</Tex>
+          <span style={{ marginLeft: '1em' }}><Tex>{`\\textcolor{${G}}{F}^{-1}\\nabla\\textcolor{${Lc}}{L} = ${pair(n)}`}</Tex></span>
+        </div>
+        <div>
+          <Tex>{`\\log\\sigma\\text{ 좌표: }\\ \\nabla\\textcolor{${Lc}}{L} = ${pair(gl)},\\ \\ \\textcolor{${G}}{F} = \\mathrm{diag}(${f(1 / (s * s))},\\ 2)`}</Tex>
+          <span style={{ marginLeft: '1em' }}><Tex>{`\\textcolor{${G}}{F}^{-1}\\nabla\\textcolor{${Lc}}{L} = ${pair(nl)}`}</Tex></span>
+        </div>
+        <div>
+          <Tex>{`\\text{자연 경사를 옮기면: } ${f(n[1])} \\div \\textcolor{${C}}{\\sigma} = ${f(n[1] / s)} = ${f(nl[1])}\\ \\ (\\text{일치})`}</Tex>
+        </div>
+        <div>
+          <Tex>{`\\text{보통 경사를 옮기면: } ${f(g[1])} \\div \\textcolor{${C}}{\\sigma} = ${f(g[1] / s)} ${Math.abs(g[1] / s - gl[1]) < 0.005 ? '= ' + f(gl[1]) + '\\ \\ (\\sigma = 1\\text{ 에서만 우연히 같음})' : '\\neq ' + f(gl[1]) + '\\ \\ (\\text{불일치})'}`}</Tex>
+        </div>
+      </div>
       <div class="viz-controls">
-        <span style={{ color: 'var(--fg-muted)', fontSize: '0.85em' }}>
-          \uD074\uB9AD\uD558\uC5EC \uC2DC\uC791\uC810 \uBCC0\uACBD \u00B7 \uBE68\uAC04 \uD654\uC0B4\uD45C = \u2207L \u00B7 \uD30C\uB780 \uD654\uC0B4\uD45C = F\u207B\u00B9\u2207L
+        <button class="viz-btn" onClick={() => setStart([0, 0.5])}>따라 계산해 보기의 점 (0, 0.5)</button>
+        <button class="viz-btn" onClick={() => setStart([-1, 2.2])}>(−1, 2.2)</button>
+        <button class="viz-btn" onClick={() => setStart([3.3, 0.25])}>(3.3, 0.25)</button>
+        <span style={{ fontSize: '0.85em', color: 'var(--fg-muted)' }}>
+          {legend('1.6px solid var(--fg)', 'σ 좌표의 보통 경사')}
+          {legend('2px dashed var(--fg-muted)', 'log σ 좌표의 보통 경사')}
+          {legend(`4px solid ${pal.metric}`, '자연 경사 (두 좌표 모두)')}
+          · 평면을 눌러 출발점 옮기기 · 점 = 최솟값 (2, 1)
         </span>
       </div>
     </div>

@@ -1,253 +1,289 @@
+// 1장 — 두 입체사영 차트로 구면 덮기.
+// 구면(드래그 회전) | φ_N 평면 | φ_S 평면. 평면에서 점을 끌면 구면 위 점이 따라온다.
+// 색: 차트 사상 φ = chart, 차트 좌표 (x, y) = coord (palette.json).
 import { h, render } from 'preact';
 import { useState, useRef } from 'preact/hooks';
 import { useCanvas, usePointer } from './shared/canvas-utils.jsx';
 import { useThemeColors } from './shared/theme.jsx';
-import {
-  sphereToCart, project3D, vecScale, drawSphereWireframe,
-} from './shared/math.js';
+import { usePalette, HEX } from './shared/palette.js';
+import { Tex } from './shared/tex.jsx';
+import { project3D } from './shared/math.js';
 
 const TAU = 2 * Math.PI;
-const CHARTS = [
-  { name: '차트 1 (앞면)', color: 'rgba(33,150,243,0.25)', border: '#2196F3',
-    thetaRange: [0.2, 2.2], phiRange: [-1.2, 1.2] },
-  { name: '차트 2 (뒷면)', color: 'rgba(76,175,80,0.25)', border: '#4CAF50',
-    thetaRange: [0.2, 2.2], phiRange: [1.8, 4.2] },
-  { name: '차트 3 (북극)', color: 'rgba(255,152,0,0.25)', border: '#FF9800',
-    thetaRange: [0, 0.9], phiRange: [0, TAU] },
-  { name: '차트 4 (남극)', color: 'rgba(233,30,99,0.25)', border: '#E91E63',
-    thetaRange: [2.2, Math.PI], phiRange: [0, TAU] },
+const WIN = 3.2;          // 차트 평면에 보이는 범위 [-WIN, WIN]
+const FAR = 1e3;          // 이보다 크면 "무한대로 달아남"
+
+// φ_N(p) = (X, Y)/(1 − Z),  φ_S(p) = (X, Y)/(1 + Z)
+const phiN = ([X, Y, Z]) => [X / (1 - Z), Y / (1 - Z)];
+const phiS = ([X, Y, Z]) => [X / (1 + Z), Y / (1 + Z)];
+function invN([x, y]) {
+  const r2 = x * x + y * y;
+  return [2 * x / (1 + r2), 2 * y / (1 + r2), (r2 - 1) / (r2 + 1)];
+}
+function invS([x, y]) {
+  const r2 = x * x + y * y;
+  return [2 * x / (1 + r2), 2 * y / (1 + r2), (1 - r2) / (1 + r2)];
+}
+const normalize = (p) => { const n = Math.hypot(...p); return p.map(v => v / n); };
+
+const PRESETS = [
+  { label: '점 A', p: [0.6, 0, 0.8] },
+  { label: '점 B', p: [0, -0.8, -0.6] },
+  { label: '북극 가까이', p: normalize([0.03, 0.01, 1]) },
+  { label: '남극 가까이', p: normalize([0.03, 0.01, -1]) },
 ];
 
-// Stereographic projection from north pole: φ_N(x,y,z) = (x/(1-z), y/(1-z))
-function stereoNorth(x, y, z) {
-  const denom = 1 - z;
-  if (Math.abs(denom) < 1e-8) return null;
-  return [x / denom, y / denom];
+function fmt(v) {
+  if (!isFinite(v) || Math.abs(v) > FAR) return v > 0 ? '+\\infty' : '-\\infty';
+  return v.toFixed(2);
 }
 
-// Stereographic projection from south pole: φ_S(x,y,z) = (x/(1+z), y/(1+z))
-function stereoSouth(x, y, z) {
-  const denom = 1 + z;
-  if (Math.abs(denom) < 1e-8) return null;
-  return [x / denom, y / denom];
+function layout(w, h) {
+  if (w >= 640) {
+    const cw = w / 3;
+    const s = Math.min(cw - 14, h - 64);
+    return {
+      col: cw,
+      sphere: { cx: cw / 2, cy: h / 2, R: Math.min(cw / 2 - 16, h / 2 - 40) },
+      N: { x: cw + (cw - s) / 2, y: (h - s) / 2 + 8, s },
+      S: { x: 2 * cw + (cw - s) / 2, y: (h - s) / 2 + 8, s },
+    };
+  }
+  const half = w / 2;
+  const s = Math.min(half - 16, h / 2 - 34);
+  return {
+    col: half,
+    sphere: { cx: half / 2, cy: h / 2, R: Math.min(half / 2 - 10, h / 2 - 30) },
+    N: { x: half + (half - s) / 2, y: 24, s },
+    S: { x: half + (half - s) / 2, y: h / 2 + 24, s },
+  };
 }
 
-// Chart projection info — maps chart index to a description and projection
-const CHART_PROJECTIONS = [
-  { label: 'φ₁: U₁ → R²  (앞면 투영)',
-    formula: (x, y, z) => [x / (1 - z), y / (1 - z)],
-    formulaText: (x, y, z) => `φ₁(${x}, ${y}, ${z}) = (${x}/(1−${z}), ${y}/(1−${z}))`,
-    proj: stereoNorth },
-  { label: 'φ₂: U₂ → R²  (뒷면 투영)',
-    formula: (x, y, z) => [x / (1 + z), y / (1 + z)],
-    formulaText: (x, y, z) => `φ₂(${x}, ${y}, ${z}) = (${x}/(1+${z}), ${y}/(1+${z}))`,
-    proj: stereoSouth },
-  { label: 'φ₃: U₃ → R²  (북극 투영)',
-    proj: stereoNorth },
-  { label: 'φ₄: U₄ → R²  (남극 투영)',
-    proj: stereoSouth },
-];
+// 차트 평면 좌표 ↔ 화면
+const toScr = (P, [x, y]) => [P.x + P.s / 2 + (x / WIN) * P.s / 2, P.y + P.s / 2 - (y / WIN) * P.s / 2];
+const fromScr = (P, sx, sy) => [((sx - P.x - P.s / 2) / (P.s / 2)) * WIN, -((sy - P.y - P.s / 2) / (P.s / 2)) * WIN];
+const inside = (P, sx, sy) => sx >= P.x && sx <= P.x + P.s && sy >= P.y && sy <= P.y + P.s;
 
 function Ch01Viz() {
   const colors = useThemeColors();
-  const [activeChart, setActiveChart] = useState(-1);
-  const rot = useRef({ y: -0.6, x: 0.3 });
-  const dragRef = useRef(null);
+  const pal = usePalette();
+  const pRef = useRef(PRESETS[0].p);
+  const rot = useRef({ y: -0.5, x: 0.35 });
+  const drag = useRef(null);
+  const [readP, setReadP] = useState(PRESETS[0].p);
+  const pending = useRef(false);
+
+  // 수식 패널은 프레임당 한 번만 갱신
+  function setPoint(p) {
+    pRef.current = p;
+    if (!pending.current) {
+      pending.current = true;
+      requestAnimationFrame(() => { pending.current = false; setReadP(pRef.current); });
+    }
+  }
 
   const drawRef = useRef(null);
   drawRef.current = (ctx, w, h) => {
-    const cx = w / 2, cy = h / 2;
-    const R = Math.min(w, h) * 0.33;
-    const { y: rotY, x: rotX } = rot.current;
+    const L = layout(w, h);
+    const p = pRef.current;
+    const { y: ry, x: rx } = rot.current;
+    const { cx, cy, R } = L.sphere;
+    const pr = (q) => project3D([q[0] * R, q[2] * R, q[1] * R], cx, cy, 1, ry, rx); // Z 를 화면 위쪽으로
 
-    drawSphereWireframe(ctx, cx, cy, R, rotY, rotX, colors.fgMuted);
+    // ── 구면 ──
+    ctx.strokeStyle = colors.border;
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.stroke();
 
-    CHARTS.forEach((chart, ci) => {
-      const isActive = activeChart === ci;
-      ctx.fillStyle = chart.color;
-      ctx.strokeStyle = chart.border;
-      ctx.lineWidth = isActive ? 2.5 : 1;
-      ctx.globalAlpha = isActive ? 1 : 0.6;
-
-      const tSteps = 16, pSteps = 24;
-      for (let ti = 0; ti < tSteps; ti++) {
-        for (let pi = 0; pi < pSteps; pi++) {
-          const t0 = chart.thetaRange[0] + (ti / tSteps) * (chart.thetaRange[1] - chart.thetaRange[0]);
-          const t1 = chart.thetaRange[0] + ((ti + 1) / tSteps) * (chart.thetaRange[1] - chart.thetaRange[0]);
-          const p0 = chart.phiRange[0] + (pi / pSteps) * (chart.phiRange[1] - chart.phiRange[0]);
-          const p1 = chart.phiRange[0] + ((pi + 1) / pSteps) * (chart.phiRange[1] - chart.phiRange[0]);
-
-          const corners = [
-            project3D(vecScale(sphereToCart(t0, p0), R), cx, cy, 1, rotY, rotX),
-            project3D(vecScale(sphereToCart(t0, p1), R), cx, cy, 1, rotY, rotX),
-            project3D(vecScale(sphereToCart(t1, p1), R), cx, cy, 1, rotY, rotX),
-            project3D(vecScale(sphereToCart(t1, p0), R), cx, cy, 1, rotY, rotX),
-          ];
-
-          const avgZ = (corners[0].z + corners[1].z + corners[2].z + corners[3].z) / 4;
-          if (avgZ < 0) continue;
-
-          ctx.beginPath();
-          ctx.moveTo(corners[0].x, corners[0].y);
-          ctx.lineTo(corners[1].x, corners[1].y);
-          ctx.lineTo(corners[2].x, corners[2].y);
-          ctx.lineTo(corners[3].x, corners[3].y);
-          ctx.closePath();
-          ctx.fill();
-        }
-      }
-
+    function curve3(fn, n, style, width, dash) {
+      ctx.strokeStyle = style; ctx.lineWidth = width; ctx.setLineDash(dash || []);
+      let on = false;
       ctx.beginPath();
-      for (let i = 0; i <= 40; i++) {
-        const theta = chart.thetaRange[0] + (i / 40) * (chart.thetaRange[1] - chart.thetaRange[0]);
-        const p = project3D(vecScale(sphereToCart(theta, chart.phiRange[0]), R), cx, cy, 1, rotY, rotX);
-        if (p.z > 0) { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); }
+      for (let i = 0; i <= n; i++) {
+        const q = pr(fn(i / n));
+        if (q.z >= 0) { if (!on) ctx.moveTo(q.x, q.y); else ctx.lineTo(q.x, q.y); on = true; }
+        else on = false;
       }
-      ctx.stroke();
+      ctx.stroke(); ctx.setLineDash([]);
+    }
+    for (const Z of [-0.866, -0.5, 0.5, 0.866]) {
+      const r = Math.sqrt(1 - Z * Z);
+      curve3(t => [r * Math.cos(TAU * t), r * Math.sin(TAU * t), Z], 72, colors.border, 1);
+    }
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI;
+      curve3(t => [Math.cos(a) * Math.sin(TAU * t), Math.sin(a) * Math.sin(TAU * t), Math.cos(TAU * t)], 96, colors.border, 1);
+    }
+    curve3(t => [Math.cos(TAU * t), Math.sin(TAU * t), 0], 96, colors.fgMuted, 1.5, [5, 4]); // 적도
+
+    // 극점
+    for (const [q, name] of [[[0, 0, 1], 'N'], [[0, 0, -1], 'S']]) {
+      const s = pr(q);
+      ctx.globalAlpha = s.z >= 0 ? 1 : 0.35;
+      ctx.fillStyle = pal.chart;
+      ctx.beginPath(); ctx.arc(s.x, s.y, 4, 0, TAU); ctx.fill();
+      ctx.font = 'bold 12px sans-serif';
+      ctx.fillText(name === 'N' ? '북극' : '남극', s.x + 7, s.y + (name === 'N' ? -4 : 12));
       ctx.globalAlpha = 1;
-    });
-
-    // Draw a sample point on the sphere when a chart is active
-    if (activeChart >= 0) {
-      const chart = CHARTS[activeChart];
-      const projInfo = CHART_PROJECTIONS[activeChart];
-      // Sample point at the center of the active chart
-      const sampleTheta = (chart.thetaRange[0] + chart.thetaRange[1]) / 2;
-      const samplePhi = (chart.phiRange[0] + chart.phiRange[1]) / 2;
-      const pos = sphereToCart(sampleTheta, samplePhi);
-      const [sx, sy, sz] = pos;
-      const pScreen = project3D(vecScale(pos, R), cx, cy, 1, rotY, rotX);
-
-      // Draw sample point
-      ctx.fillStyle = chart.border;
-      ctx.beginPath();
-      ctx.arc(pScreen.x, pScreen.y, 5, 0, TAU);
-      ctx.fill();
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-
-      // Compute chart coordinates
-      const chartCoords = projInfo.proj(sx, sy, sz);
-
-      // === Formula panel (top-right area) ===
-      const panelX = w - 280;
-      const panelY = 10;
-      const lineH = 18;
-
-      // Panel background
-      ctx.fillStyle = (colors.bgCode || colors.bg);
-      ctx.globalAlpha = 0.88;
-      ctx.fillRect(panelX - 8, panelY - 4, 276, 130);
-      ctx.globalAlpha = 1;
-      ctx.strokeStyle = chart.border;
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(panelX - 8, panelY - 4, 276, 130);
-
-      ctx.font = 'bold 12px monospace';
-      ctx.fillStyle = chart.border;
-      ctx.fillText(projInfo.label, panelX, panelY + 14);
-
-      ctx.font = '12px monospace';
-
-      // Sphere-space coordinates (in chart color)
-      ctx.fillStyle = chart.border;
-      ctx.fillText(`구면 좌표: (θ, φ) = (${sampleTheta.toFixed(2)}, ${samplePhi.toFixed(2)})`, panelX, panelY + 14 + lineH);
-
-      // Cartesian coordinates
-      ctx.fillStyle = colors.fg;
-      ctx.fillText(`직교 좌표: (x,y,z) = (${sx.toFixed(2)}, ${sy.toFixed(2)}, ${sz.toFixed(2)})`, panelX, panelY + 14 + lineH * 2);
-
-      // The mapping formula with color
-      const isNorth = (activeChart === 0 || activeChart === 2);
-      const sign = isNorth ? '−' : '+';
-      const denomVal = isNorth ? (1 - sz) : (1 + sz);
-
-      // Formula line: φ(x,y,z) = (x/(1±z), y/(1±z))
-      let fy = panelY + 14 + lineH * 3.3;
-      ctx.fillStyle = colors.fgMuted;
-      ctx.fillText(`φ(`, panelX, fy);
-      ctx.fillStyle = colors.accent; // blue for x
-      ctx.fillText(`x`, panelX + ctx.measureText('φ(').width, fy);
-      ctx.fillStyle = colors.fgMuted;
-      const afterX = panelX + ctx.measureText('φ(x').width;
-      ctx.fillText(`,`, afterX, fy);
-      ctx.fillStyle = '#e53935'; // red for y
-      ctx.fillText(`y`, afterX + ctx.measureText(', ').width, fy);
-      ctx.fillStyle = colors.fgMuted;
-      const afterY = afterX + ctx.measureText(', y').width;
-      ctx.fillText(`,z) = (`, afterY, fy);
-      // x/(1±z)
-      const eqStart = afterY + ctx.measureText(',z) = (').width;
-      ctx.fillStyle = colors.accent;
-      ctx.fillText(`${sx.toFixed(2)}`, eqStart, fy);
-      ctx.fillStyle = colors.fgMuted;
-      const afterNum1 = eqStart + ctx.measureText(`${sx.toFixed(2)}`).width;
-      ctx.fillText(`/(1${sign}${sz.toFixed(2)}), `, afterNum1, fy);
-      // y/(1±z)
-      const afterMid = afterNum1 + ctx.measureText(`/(1${sign}${sz.toFixed(2)}), `).width;
-      ctx.fillStyle = '#e53935';
-      ctx.fillText(`${sy.toFixed(2)}`, afterMid, fy);
-      ctx.fillStyle = colors.fgMuted;
-      const afterNum2 = afterMid + ctx.measureText(`${sy.toFixed(2)}`).width;
-      ctx.fillText(`/(1${sign}${sz.toFixed(2)}))`, afterNum2, fy);
-
-      // Result
-      fy += lineH * 1.2;
-      if (chartCoords) {
-        ctx.fillStyle = chart.border;
-        ctx.font = 'bold 12px monospace';
-        ctx.fillText(`= (${chartCoords[0].toFixed(3)}, ${chartCoords[1].toFixed(3)})`, panelX + 12, fy);
-      } else {
-        ctx.fillStyle = '#e53935';
-        ctx.font = 'bold 12px monospace';
-        ctx.fillText('정의되지 않음 (특이점)', panelX + 12, fy);
-      }
-
-      // Description
-      fy += lineH * 1.3;
-      ctx.font = '11px sans-serif';
-      ctx.fillStyle = colors.fgMuted;
-      ctx.fillText(`● 점은 차트 중심의 샘플 좌표`, panelX, fy);
     }
 
-    // Legend
-    ctx.font = '13px sans-serif';
-    CHARTS.forEach((chart, ci) => {
-      const y = 20 + ci * 22;
-      ctx.fillStyle = chart.border;
-      ctx.fillRect(10, y - 8, 12, 12);
-      ctx.fillStyle = activeChart === ci ? colors.fg : colors.fgMuted;
-      ctx.fillText(chart.name, 28, y + 2);
-    });
-
+    // 북극에서 비춘 빛: 북극 → p → 적도면 위 φ_N(p)
+    const uN = phiN(p);
+    const rN = Math.hypot(...uN);
+    if (rN < 6) {
+      // 남반구 점은 광선이 적도면을 먼저 지나 p 에 닿는다
+      const a = pr([0, 0, 1]), b = pr([uN[0], uN[1], 0]), end = p[2] < 0 ? pr(p) : b;
+      ctx.save(); ctx.beginPath(); ctx.rect(0, 0, L.col, h); ctx.clip();
+      ctx.strokeStyle = pal.chart; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.8;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(end.x, end.y); ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = pal.coord;
+      ctx.beginPath(); ctx.arc(b.x, b.y, 3.5, 0, TAU); ctx.fill();
+      ctx.restore();
+    }
+    // 점 p
+    const ps = pr(p);
+    ctx.fillStyle = colors.fg;
+    ctx.globalAlpha = ps.z >= 0 ? 1 : 0.4;
+    ctx.beginPath(); ctx.arc(ps.x, ps.y, 6, 0, TAU); ctx.fill();
+    ctx.strokeStyle = colors.bg; ctx.lineWidth = 2; ctx.stroke();
+    ctx.globalAlpha = 1;
     ctx.fillStyle = colors.fgMuted;
     ctx.font = '12px sans-serif';
-    ctx.fillText('드래그하여 회전 · 클릭하여 차트 선택', 10, h - 12);
+    ctx.textAlign = 'center';
+    ctx.fillText('구면 (끌어서 회전)', cx, cy + R + 26);
+    ctx.textAlign = 'left';
+
+    // ── 차트 평면 두 장 ──
+    function chartPanel(P, which) {
+      const u = which === 'N' ? phiN(p) : phiS(p);
+      ctx.save();
+      ctx.beginPath(); ctx.rect(P.x, P.y, P.s, P.s); ctx.clip();
+      ctx.fillStyle = colors.bg; ctx.fillRect(P.x, P.y, P.s, P.s);
+
+      // 북반구 영역 음영: φ_N 에서는 단위원 밖, φ_S 에서는 단위원 안
+      const [ox, oy] = toScr(P, [0, 0]);
+      const unit = P.s / 2 / WIN;
+      ctx.fillStyle = colors.fgMuted; ctx.globalAlpha = 0.09;
+      ctx.beginPath();
+      if (which === 'N') { ctx.rect(P.x, P.y, P.s, P.s); ctx.arc(ox, oy, unit, 0, TAU, true); }
+      else ctx.arc(ox, oy, unit, 0, TAU);
+      ctx.fill(); ctx.globalAlpha = 1;
+
+      // 축과 격자
+      ctx.strokeStyle = colors.border; ctx.lineWidth = 1;
+      for (let k = -3; k <= 3; k++) {
+        const [gx] = toScr(P, [k, 0]); const [, gy] = toScr(P, [0, k]);
+        ctx.beginPath(); ctx.moveTo(gx, P.y); ctx.lineTo(gx, P.y + P.s); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(P.x, gy); ctx.lineTo(P.x + P.s, gy); ctx.stroke();
+      }
+      // 위도선의 그림자
+      for (const Z of [-0.866, -0.5, 0.5, 0.866]) {
+        const r = which === 'N' ? Math.sqrt((1 + Z) / (1 - Z)) : Math.sqrt((1 - Z) / (1 + Z));
+        ctx.beginPath(); ctx.arc(ox, oy, r * unit, 0, TAU); ctx.stroke();
+      }
+      // 적도 = 단위원
+      ctx.strokeStyle = colors.fgMuted; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.arc(ox, oy, unit, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+
+      // 점
+      const r = Math.hypot(...u);
+      if (isFinite(r) && Math.abs(u[0]) < WIN && Math.abs(u[1]) < WIN) {
+        const [sx, sy] = toScr(P, u);
+        ctx.fillStyle = pal.coord;
+        ctx.beginPath(); ctx.arc(sx, sy, 6, 0, TAU); ctx.fill();
+        ctx.strokeStyle = colors.bg; ctx.lineWidth = 2; ctx.stroke();
+      } else {
+        // 화면 밖: 가장자리에 화살표
+        const ang = isFinite(r) && r > 0 ? Math.atan2(u[1], u[0]) : 0;
+        const ex = ox + Math.cos(ang) * (P.s / 2 - 12), ey = oy - Math.sin(ang) * (P.s / 2 - 12);
+        ctx.fillStyle = pal.coord;
+        ctx.save(); ctx.translate(ex, ey); ctx.rotate(-ang);
+        ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-6, -6); ctx.lineTo(-6, 6); ctx.closePath(); ctx.fill();
+        ctx.restore();
+      }
+      ctx.restore();
+
+      ctx.strokeStyle = pal.chart; ctx.lineWidth = 2;
+      ctx.strokeRect(P.x, P.y, P.s, P.s);
+      // 제목: φ 에 아래첨자
+      ctx.fillStyle = pal.chart;
+      ctx.font = 'italic bold 15px serif';
+      ctx.fillText('φ', P.x, P.y - 8);
+      const fw = ctx.measureText('φ').width;
+      ctx.font = 'italic bold 10px serif';
+      ctx.fillText(which, P.x + fw + 1, P.y - 4);
+      ctx.font = 'bold 12px sans-serif';
+      const wide = w >= 640;
+      ctx.fillText(which === 'N' ? (wide ? '평면 · 북극에서 비춤' : '북극에서') : (wide ? '평면 · 남극에서 비춤' : '남극에서'), P.x + fw + 14, P.y - 8);
+    }
+    chartPanel(L.N, 'N');
+    chartPanel(L.S, 'S');
   };
 
   const canvasRef = useCanvas(drawRef);
 
   usePointer(canvasRef, {
-    onDown: (pos) => { dragRef.current = { mx: pos.x, my: pos.y, ry: rot.current.y, rx: rot.current.x }; },
-    onDrag: (pos) => {
-      if (!dragRef.current) return;
-      rot.current = {
-        y: dragRef.current.ry + (pos.x - dragRef.current.mx) * 0.01,
-        x: dragRef.current.rx - (pos.y - dragRef.current.my) * 0.01,
-      };
+    onDown: (pos) => {
+      const c = canvasRef.current;
+      const L = layout(c.clientWidth, c.clientHeight);
+      if (inside(L.N, pos.x, pos.y)) drag.current = { kind: 'N', P: L.N };
+      else if (inside(L.S, pos.x, pos.y)) drag.current = { kind: 'S', P: L.S };
+      else drag.current = { kind: 'rot', mx: pos.x, my: pos.y, ry: rot.current.y, rx: rot.current.x };
+      if (drag.current.kind !== 'rot') moveTo(pos);
     },
-    onClick: () => { setActiveChart(a => (a + 1) % (CHARTS.length + 1) - 1); },
-    onUp: () => { dragRef.current = null; },
+    onDrag: (pos) => {
+      const d = drag.current;
+      if (!d) return;
+      if (d.kind === 'rot') {
+        rot.current = {
+          y: d.ry + (pos.x - d.mx) * 0.01,
+          x: Math.max(-1.4, Math.min(1.4, d.rx + (pos.y - d.my) * 0.01)),
+        };
+      } else moveTo(pos);
+    },
+    onUp: () => { drag.current = null; },
   });
+
+  function moveTo(pos) {
+    const d = drag.current;
+    const u = fromScr(d.P, pos.x, pos.y);
+    setPoint(d.kind === 'N' ? invN(u) : invS(u));
+  }
+
+  // ── 수식 패널 ──
+  const C = HEX.coord, H = HEX.chart;
+  const uN = phiN(readP), uS = phiS(readP);
+  const nFar = !(Math.hypot(...uN) < FAR);
+  const r2 = uN[0] * uN[0] + uN[1] * uN[1];
+  const tr = [uN[0] / r2, uN[1] / r2];
+  const xy = (u) => `(\\textcolor{${C}}{${fmt(u[0])}},\\ \\textcolor{${C}}{${fmt(u[1])}})`;
 
   return (
     <div class="viz-inner">
+      <div class="viz-message">
+        점을 북극으로 끌고 가면 <Tex>{`\\textcolor{${H}}{\\varphi_N}`}</Tex> 좌표는 무한대로 달아나지만 <Tex>{`\\textcolor{${H}}{\\varphi_S}`}</Tex> 좌표는 멀쩡하다. 겹치는 곳에서 두 좌표는 언제나 반전 규칙으로 이어진다.
+      </div>
       <canvas ref={canvasRef} />
+      <div class="viz-formula">
+        <div>
+          <Tex>{`p = (${readP.map(v => v.toFixed(2)).join(',\\ ')})`}</Tex>
+          <span style={{ color: 'var(--fg-muted)', marginLeft: '0.6em', fontSize: '0.9em' }}>구면 위 점의 3차원 위치</span>
+        </div>
+        <div>
+          <Tex>{`\\textcolor{${H}}{\\varphi_N}(p) = ${xy(uN)}`}</Tex>
+          {nFar && <span style={{ color: 'var(--fg-muted)', marginLeft: '0.6em', fontSize: '0.9em' }}>북극은 이 차트에 없다</span>}
+        </div>
+        <div><Tex>{`\\textcolor{${H}}{\\varphi_S}(p) = ${xy(uS)}`}</Tex></div>
+        <div>
+          <Tex>{`\\textcolor{${H}}{\\varphi_S}\\circ\\textcolor{${H}}{\\varphi_N}^{-1}(\\textcolor{${C}}{x},\\textcolor{${C}}{y}) = \\frac{(\\textcolor{${C}}{x},\\textcolor{${C}}{y})}{\\textcolor{${C}}{x}^2+\\textcolor{${C}}{y}^2} = ${isFinite(r2) && r2 > 0 ? xy(tr) : '\\text{(정의되지 않음)}'}`}</Tex>
+        </div>
+      </div>
       <div class="viz-controls">
-        <span style={{ color: 'var(--fg-muted)', fontSize: '0.9em' }}>
-          구면을 4개의 차트(좌표 패치)로 덮는 아틀라스. 클릭하면 좌표 사상 공식을 볼 수 있다.
-        </span>
+        {PRESETS.map(pr => (
+          <button class="viz-btn" onClick={() => setPoint(pr.p)}>{pr.label}</button>
+        ))}
+        <span style={{ color: 'var(--fg-muted)', fontSize: '0.85em' }}>평면에서 점을 끌기 · 구면을 끌어 회전 · 회색 음영 = 북반구 · 점선 = 적도</span>
       </div>
     </div>
   );
