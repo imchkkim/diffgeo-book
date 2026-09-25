@@ -237,6 +237,7 @@ const indexTocHtml = chapterData
   .join("\n");
 
 const indexBody = `<div class="toc-page">
+<nav class="site-nav"><a href="/">&larr; 전체 교재</a></nav>
 <h1>${TITLE}</h1>
 <ol class="toc-list">
 ${indexTocHtml}

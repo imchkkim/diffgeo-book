@@ -532,6 +532,14 @@ pre.mermaid {
 .toc-page h1 {
   margin-bottom: 1.5rem;
 }
+/* 대문(교재 목록)으로 돌아가는 링크 */
+.site-nav { font-size: 0.9rem; }
+.site-nav a { color: var(--fg-muted); text-decoration: none; }
+.site-nav a:hover { color: var(--accent); }
+.site-nav + h1 { margin-top: 1rem; }
+/* 좁은 화면에선 왼쪽 위 고정 목차 버튼(☰)과 겹치지 않게 비켜 선다 */
+@media (max-width: 960px) { .site-nav { padding-left: 3rem; } }
+@media print { .site-nav { display: none; } }
 .toc-list {
   list-style: none;
   padding: 0;
