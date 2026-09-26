@@ -138,11 +138,11 @@ function Ch03Poincare() {
           <Tex>{`\\textcolor{${M}}{ds} = \\frac{2}{1-\\textcolor{${C}}{x}^2-\\textcolor{${C}}{y}^2}\\sqrt{d\\textcolor{${C}}{x}^2+d\\textcolor{${C}}{y}^2},\\qquad P = (\\textcolor{${C}}{${readP[0].toFixed(2)}},\\ \\textcolor{${C}}{${readP[1].toFixed(2)}})`}</Tex>
         </div>
         <div>
-          <Tex>{`\\text{눈금 배율 } \\frac{2}{1 - r^2} = ${lam.toFixed(2)}\\quad(r = ${r.toFixed(3)})`}</Tex>
+          <Tex>{`\\text{눈금 배율 } \\frac{2}{1 - \\textcolor{${C}}{r}^2} = ${lam.toFixed(2)}\\quad(\\textcolor{${C}}{r} = ${r.toFixed(3)})`}</Tex>
           <span style={{ color: 'var(--fg-muted)', marginLeft: '0.6em', fontSize: '0.9em' }}>그림 위 1칸이 실제로는 이만큼</span>
         </div>
         <div>
-          <Tex>{`\\text{중심에서 실제 거리 } \\ln\\frac{1+r}{1-r} = ${d.toFixed(2)}`}</Tex>
+          <Tex>{`\\text{중심에서 실제 거리 } \\ln\\frac{1+\\textcolor{${C}}{r}}{1-\\textcolor{${C}}{r}} = ${d.toFixed(2)}`}</Tex>
           <span style={{ color: 'var(--fg-muted)', marginLeft: '0.6em', fontSize: '0.9em' }}>눈금 하나 = 실제 거리 0.5</span>
         </div>
       </div>

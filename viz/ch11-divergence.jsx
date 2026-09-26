@@ -164,6 +164,7 @@ function Ch11Viz() {
   function preset(q) { pts.current = { p: [0.5, 0.3, 0.2], q }; publish(); }
 
   const D = HEX.div, P = HEX.dist, G = HEX.metric;
+  const Dl = `\\textcolor{${HEX.aux4}}{\\delta}`;
   const { p, q } = read;
   const dpq = kl(p, q), dqp = kl(q, p), qd = quad(p, q);
   const vec = v => `(${v.map(x => x.toFixed(2)).join(',\\,')})`;
@@ -172,7 +173,7 @@ function Ch11Viz() {
   return (
     <div class="viz-inner">
       <div class="viz-message">
-        <Tex>{`\\textcolor{${P}}{q}`}</Tex>를 <Tex>{`\\textcolor{${P}}{p}`}</Tex> 가까이 끌어오면 두 방향의 발산이 같아지고, 둘 다 피셔 계량의 이차식 <Tex>{`\\tfrac12\\textcolor{${G}}{g}_{ij}\\delta^i\\delta^j`}</Tex>에 붙는다. 멀어질수록 세 값이 갈라진다.
+        <Tex>{`\\textcolor{${P}}{q}`}</Tex>를 <Tex>{`\\textcolor{${P}}{p}`}</Tex> 가까이 끌어오면 두 방향의 발산이 같아지고, 둘 다 피셔 계량의 이차식 <Tex>{`\\tfrac12\\textcolor{${G}}{g}_{ij}${Dl}^i${Dl}^j`}</Tex>에 붙는다. 멀어질수록 세 값이 갈라진다.
       </div>
       <canvas ref={canvasRef} />
       <div class="viz-formula">
@@ -181,7 +182,7 @@ function Ch11Viz() {
         </div>
         <div><Tex>{`\\textcolor{${D}}{D}(\\textcolor{${P}}{p}\\,\\|\\,\\textcolor{${P}}{q}) = \\sum_i \\textcolor{${P}}{p}_i \\log\\frac{\\textcolor{${P}}{p}_i}{\\textcolor{${P}}{q}_i} = ${dpq.toFixed(4)}`}</Tex></div>
         <div><Tex>{`\\textcolor{${D}}{D}(\\textcolor{${P}}{q}\\,\\|\\,\\textcolor{${P}}{p}) = \\sum_i \\textcolor{${P}}{q}_i \\log\\frac{\\textcolor{${P}}{q}_i}{\\textcolor{${P}}{p}_i} = ${dqp.toFixed(4)}`}</Tex></div>
-        <div><Tex>{`\\tfrac12 \\textcolor{${G}}{g}_{ij}\\delta^i\\delta^j = \\tfrac12\\sum_i \\frac{(\\textcolor{${P}}{q}_i - \\textcolor{${P}}{p}_i)^2}{\\textcolor{${P}}{p}_i} = ${qd.toFixed(4)}`}</Tex></div>
+        <div><Tex>{`\\tfrac12 \\textcolor{${G}}{g}_{ij}${Dl}^i${Dl}^j = \\tfrac12\\sum_i \\frac{(\\textcolor{${P}}{q}_i - \\textcolor{${P}}{p}_i)^2}{\\textcolor{${P}}{p}_i} = ${qd.toFixed(4)}`}</Tex></div>
         <div>
           <Tex>{`\\textcolor{${D}}{D}(\\textcolor{${P}}{p}\\|\\textcolor{${P}}{q}) \\,/\\, \\textcolor{${D}}{D}(\\textcolor{${P}}{q}\\|\\textcolor{${P}}{p}) = ${dqp > 1e-9 ? (dpq / dqp).toFixed(3) : '\\text{—}'}`}</Tex>
         </div>
@@ -196,7 +197,7 @@ function Ch11Viz() {
         <button class="viz-btn" onClick={() => preset([0.2, 0.5, 0.3])}>멀리</button>
         <button class="viz-btn" onClick={() => preset([0.46, 0.33, 0.21])}>가까이</button>
         <span style={{ color: 'var(--fg-muted)', fontSize: '0.85em' }}>
-          점 끌기 · 실선 <Tex>{`\\textcolor{${D}}{D}(\\textcolor{${P}}{p}\\|\\cdot)=c`}</Tex> · 긴 점선 <Tex>{`\\textcolor{${D}}{D}(\\cdot\\|\\textcolor{${P}}{p})=c`}</Tex> · 잔 점선 <Tex>{`\\tfrac12\\textcolor{${G}}{g}\\delta\\delta=c`}</Tex>
+          점 끌기 · 실선 <Tex>{`\\textcolor{${D}}{D}(\\textcolor{${P}}{p}\\|\\cdot)=c`}</Tex> · 긴 점선 <Tex>{`\\textcolor{${D}}{D}(\\cdot\\|\\textcolor{${P}}{p})=c`}</Tex> · 잔 점선 <Tex>{`\\tfrac12\\textcolor{${G}}{g}${Dl}${Dl}=c`}</Tex>
         </span>
       </div>
     </div>

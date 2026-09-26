@@ -156,7 +156,7 @@ function Ch02Viz() {
   return (
     <div class="viz-inner">
       <div class="viz-message">
-        성분 <Tex>{`(v^{\\theta}, v^{\\phi})`}</Tex>는 그대로 두고 점을 북극 쪽으로 옮겨 보자. <Tex>{`\\textcolor{${D}}{\\partial_\\phi}`}</Tex>가 짧아지므로 같은 성분이 더 느린 속도를 뜻한다. 속도 화살표는 언제나 그 점의 접평면 안에 있다.
+        성분 <Tex>{`(\\textcolor{${D}}{v^{\\theta}}, \\textcolor{${D}}{v^{\\phi}})`}</Tex>는 그대로 두고 점을 북극 쪽으로 옮겨 보자. <Tex>{`\\textcolor{${D}}{\\partial_\\phi}`}</Tex>가 짧아지므로 같은 성분이 더 느린 속도를 뜻한다. 속도 화살표는 언제나 그 점의 접평면 안에 있다.
       </div>
       <canvas ref={canvasRef} />
       <div class="viz-formula">
@@ -170,15 +170,15 @@ function Ch02Viz() {
           <Tex>{`\\textcolor{${D}}{\\partial_\\phi} = ${vec3(eF)},\\quad |\\textcolor{${D}}{\\partial_\\phi}| = \\sin\\textcolor{${C}}{\\theta} = ${sinT.toFixed(2)}`}</Tex>
         </div>
         <div>
-          <Tex>{`\\textcolor{${G}}{\\gamma'(0)} = ${vec3(v3)},\\quad |\\textcolor{${G}}{\\gamma'(0)}| = \\sqrt{(v^\\theta)^2 + \\sin^2\\textcolor{${C}}{\\theta}\\,(v^\\phi)^2} = ${speed.toFixed(2)}`}</Tex>
+          <Tex>{`\\textcolor{${G}}{\\gamma'(0)} = ${vec3(v3)},\\quad |\\textcolor{${G}}{\\gamma'(0)}| = \\sqrt{(\\textcolor{${D}}{v^\\theta})^2 + \\sin^2\\textcolor{${C}}{\\theta}\\,(\\textcolor{${D}}{v^\\phi})^2} = ${speed.toFixed(2)}`}</Tex>
           <span style={{ color: 'var(--fg-muted)', marginLeft: '0.6em', fontSize: '0.9em' }}>바깥 3차원에서 본 같은 속도</span>
         </div>
       </div>
       <div class="viz-controls">
         <Slider label={<Tex>{`\\textcolor{${C}}{\\theta}\\ \\text{(북극에서 잰 각)}`}</Tex>} min={0.05} max={3.09} step={0.01} value={theta} onChange={setTheta} />
         <Slider label={<Tex>{`\\textcolor{${C}}{\\phi}\\ \\text{(경도)}`}</Tex>} min={0} max={6.28} step={0.01} value={phi} onChange={setPhi} />
-        <Slider label={<Tex>{`v^{\\theta}`}</Tex>} min={-1.5} max={1.5} step={0.05} value={vt} onChange={setVt} />
-        <Slider label={<Tex>{`v^{\\phi}`}</Tex>} min={-1.5} max={1.5} step={0.05} value={vf} onChange={setVf} />
+        <Slider label={<Tex>{`\\textcolor{${D}}{v^{\\theta}}`}</Tex>} min={-1.5} max={1.5} step={0.05} value={vt} onChange={setVt} />
+        <Slider label={<Tex>{`\\textcolor{${D}}{v^{\\phi}}`}</Tex>} min={-1.5} max={1.5} step={0.05} value={vf} onChange={setVf} />
       </div>
     </div>
   );

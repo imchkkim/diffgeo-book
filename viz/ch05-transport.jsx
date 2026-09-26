@@ -239,7 +239,7 @@ function Ch05Viz() {
     onUp: () => { drag.current = null; },
   });
 
-  const HO = HEX.holo, K = HEX.gauss, C = HEX.coord;
+  const HO = HEX.holo, K = HEX.gauss, C = HEX.coord, OM = HEX.aux4, DA = HEX.area;
   const done = shown >= 1;
   const meas = (path.measured * DEG).toFixed(1);
   const pred = (path.predicted * DEG).toFixed(1);
@@ -256,7 +256,7 @@ function Ch05Viz() {
           <Tex>{`\\textcolor{${HO}}{\\Delta\\theta}_{\\text{측정}} = ${done ? meas + '^\\circ' : '\\text{(한 바퀴를 다 돌면 표시)}'}`}</Tex>
         </div>
         <div>
-          <Tex>{`\\iint_\\Omega \\textcolor{${K}}{K}\\,dA = 1 \\times \\text{넓이}(\\Omega) = ${area}\\ \\text{rad} = ${pred}^\\circ`}</Tex>
+          <Tex>{`\\iint_{\\textcolor{${OM}}{\\Omega}} \\textcolor{${K}}{K}\\,\\textcolor{${DA}}{dA} = 1 \\times \\text{넓이}(\\textcolor{${OM}}{\\Omega}) = ${area}\\ \\text{rad} = ${pred}^\\circ`}</Tex>
         </div>
         {mode === 'lat' && (
           <div>

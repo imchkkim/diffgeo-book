@@ -109,7 +109,7 @@ function Ch03Viz() {
     onUp: () => { drag.current = false; },
   });
 
-  const C = HEX.coord, M = HEX.metric;
+  const C = HEX.coord, M = HEX.metric, RD = HEX.radius;
   const latDeg = sel.lat / DEG;
   const thetaDeg = 90 - latDeg;
   const sinT = Math.sin((90 - latDeg) * DEG);
@@ -123,7 +123,7 @@ function Ch03Viz() {
       <canvas ref={canvasRef} />
       <div class="viz-formula">
         <div>
-          <Tex>{`\\textcolor{${M}}{ds}^2 = R^2\\left(d\\textcolor{${C}}{\\theta}^2 + \\sin^2\\textcolor{${C}}{\\theta}\\,d\\textcolor{${C}}{\\phi}^2\\right) = R^2\\left(d\\textcolor{${C}}{\\theta}^2 + ${(sinT * sinT).toFixed(3)}\\,d\\textcolor{${C}}{\\phi}^2\\right)`}</Tex>
+          <Tex>{`\\textcolor{${M}}{ds}^2 = \\textcolor{${RD}}{R}^2\\left(d\\textcolor{${C}}{\\theta}^2 + \\sin^2\\textcolor{${C}}{\\theta}\\,d\\textcolor{${C}}{\\phi}^2\\right) = \\textcolor{${RD}}{R}^2\\left(d\\textcolor{${C}}{\\theta}^2 + ${(sinT * sinT).toFixed(3)}\\,d\\textcolor{${C}}{\\phi}^2\\right)`}</Tex>
         </div>
         <div>
           <Tex>{`\\text{위도 } ${latDeg.toFixed(0)}^\\circ \\;\\Rightarrow\\; \\textcolor{${C}}{\\theta} = ${thetaDeg.toFixed(0)}^\\circ,\\quad \\text{지도 배율 } \\frac{1}{\\sin\\textcolor{${C}}{\\theta}} = ${mag.toFixed(2)},\\quad \\text{넓이 배율 } ${(mag * mag).toFixed(2)}`}</Tex>

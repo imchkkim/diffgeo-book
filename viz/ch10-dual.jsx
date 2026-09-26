@@ -102,7 +102,7 @@ function Ch10Viz() {
           ctx.fillStyle = colors.border; ctx.fillRect(x, B.y, bw, bh);
           ctx.fillStyle = c; ctx.fillRect(x, B.y + bh - hh, bw, hh);
         }
-        ctx.fillStyle = colors.fgMuted; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillStyle = (name === 'P' || name === 'Q') ? c : colors.fgMuted; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
         ctx.fillText(name.startsWith('α') ? 'α 중간점' : name, gx + (gw - 12) / 2, B.y + bh + 14);
         ctx.textAlign = 'left';
       });
@@ -111,7 +111,7 @@ function Ch10Viz() {
     const rh = B.h / rows.length;
     rows.forEach(([name, d, c], k) => {
       const y0 = B.y + k * rh;
-      ctx.fillStyle = colors.fgMuted; ctx.font = '12px sans-serif';
+      ctx.fillStyle = (name === 'P' || name === 'Q') ? c : colors.fgMuted; ctx.font = '12px sans-serif';
       ctx.fillText(name, B.x, y0 + 12);
       const bw = (B.w - 20) / 3, top = y0 + 18, bh = rh - 26;
       for (let i = 0; i < 3; i++) {
@@ -142,6 +142,7 @@ function Ch10Viz() {
   });
 
   const A = HEX.alpha, Cn = HEX.conn, D = HEX.dual, Pc = HEX.dist;
+  const Tt = `\\textcolor{${HEX.time}}{t}`;
   const p = P.current, q = Q.current;
   const v3 = (d) => `(${d.map(x => x.toFixed(2)).join(',\\ ')})`;
   const name = Math.abs(alpha - 1) < 0.02 ? '\\text{ (e-접속)}' : Math.abs(alpha + 1) < 0.02 ? '\\text{ (m-접속)}' : Math.abs(alpha) < 0.02 ? '\\text{ (레비-치비타)}' : '';
@@ -153,17 +154,17 @@ function Ch10Viz() {
       </div>
       <canvas ref={canvasRef} />
       <div class="viz-formula">
-        <div><Tex>{`\\textcolor{${D}}{\\text{m}}: (1-t)\\textcolor{${Pc}}{P} + t\\textcolor{${Pc}}{Q} \\;\\xrightarrow{t = 1/2}\\; ${v3(mGeo(p, q, 0.5))}`}</Tex></div>
-        <div><Tex>{`\\textcolor{${Cn}}{\\text{e}}: \\frac{\\textcolor{${Pc}}{P}^{1-t}\\,\\textcolor{${Pc}}{Q}^{t}}{Z(t)} \\;\\xrightarrow{t = 1/2}\\; ${v3(eGeo(p, q, 0.5))}`}</Tex></div>
-        <div><Tex>{`\\textcolor{${A}}{\\alpha} = ${alpha.toFixed(2)}${name}: \\big((1-t)\\textcolor{${Pc}}{P}^{a} + t\\textcolor{${Pc}}{Q}^{a}\\big)^{1/a},\\ a = \\tfrac{1-\\textcolor{${A}}{\\alpha}}{2} \\;\\xrightarrow{t = 1/2}\\; ${v3(aGeo(p, q, 0.5, alpha))}`}</Tex></div>
-        <div style={{ color: 'var(--fg-muted)', fontSize: '0.85em' }}>α 곡선은 α-표현에서 직선을 긋고 합이 1이 되게 되돌린 것이다. α = −1, 0, +1에서는 각 접속의 측지선과 같은 경로이고, 그 사이 값은 두 극단을 잇는 보간이다.</div>
+        <div><Tex>{`\\textcolor{${D}}{\\text{m}}: (1-${Tt})\\textcolor{${Pc}}{P} + ${Tt}\\textcolor{${Pc}}{Q} \\;\\xrightarrow{${Tt} = 1/2}\\; ${v3(mGeo(p, q, 0.5))}`}</Tex></div>
+        <div><Tex>{`\\textcolor{${Cn}}{\\text{e}}: \\frac{\\textcolor{${Pc}}{P}^{1-${Tt}}\\,\\textcolor{${Pc}}{Q}^{${Tt}}}{Z(${Tt})} \\;\\xrightarrow{${Tt} = 1/2}\\; ${v3(eGeo(p, q, 0.5))}`}</Tex></div>
+        <div><Tex>{`\\textcolor{${A}}{\\alpha} = ${alpha.toFixed(2)}${name}: \\big((1-${Tt})\\textcolor{${Pc}}{P}^{a} + ${Tt}\\textcolor{${Pc}}{Q}^{a}\\big)^{1/a},\\ a = \\tfrac{1-\\textcolor{${A}}{\\alpha}}{2} \\;\\xrightarrow{${Tt} = 1/2}\\; ${v3(aGeo(p, q, 0.5, alpha))}`}</Tex></div>
+        <div style={{ color: 'var(--fg-muted)', fontSize: '0.85em' }}><Tex>{`\\textcolor{${A}}{\\alpha}`}</Tex> 곡선은 <Tex>{`\\textcolor{${A}}{\\alpha}`}</Tex>-표현에서 직선을 긋고 합이 1이 되게 되돌린 것이다. <Tex>{`\\textcolor{${A}}{\\alpha}`}</Tex> = −1, 0, +1에서는 각 접속의 측지선과 같은 경로이고, 그 사이 값은 두 극단을 잇는 보간이다.</div>
       </div>
       <div class="viz-controls">
         <Slider label={<Tex>{`\\textcolor{${A}}{\\alpha}`}</Tex>} min={-1} max={1} step={0.01} value={alpha} onChange={setAlpha} />
-        <button class="viz-btn" onClick={() => setAlpha(-1)}>m (α = −1)</button>
-        <button class="viz-btn" onClick={() => setAlpha(0)}>레비-치비타 (α = 0)</button>
-        <button class="viz-btn" onClick={() => setAlpha(1)}>e (α = +1)</button>
-        <span style={{ color: 'var(--fg-muted)', fontSize: '0.85em' }}>P, Q 를 끌어 옮기기</span>
+        <button class="viz-btn" onClick={() => setAlpha(-1)}>m (<Tex>{`\\textcolor{${A}}{\\alpha}`}</Tex> = −1)</button>
+        <button class="viz-btn" onClick={() => setAlpha(0)}>레비-치비타 (<Tex>{`\\textcolor{${A}}{\\alpha}`}</Tex> = 0)</button>
+        <button class="viz-btn" onClick={() => setAlpha(1)}>e (<Tex>{`\\textcolor{${A}}{\\alpha}`}</Tex> = +1)</button>
+        <span style={{ color: 'var(--fg-muted)', fontSize: '0.85em' }}><Tex>{`\\textcolor{${Pc}}{P}`}</Tex>, <Tex>{`\\textcolor{${Pc}}{Q}`}</Tex> 를 끌어 옮기기</span>
       </div>
     </div>
   );

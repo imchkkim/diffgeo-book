@@ -205,27 +205,28 @@ function Ch07Viz() {
   const Rt = `\\textcolor{${Hh.riem}}{R}`;
   const u = `\\textcolor{${Hh.dir}}{u}`, v = `\\textcolor{${Hh.dir}}{v}`, W = `\\textcolor{${Hh.field}}{W}`;
   const dT = `\\textcolor{${Hh.holo}}{\\Delta\\theta}`, Kt = `\\textcolor{${Hh.gauss}}{K}`;
+  const Ep = `\\textcolor{${Hh.eps}}{\\epsilon}`, Rr = `\\textcolor{${Hh.radius}}{r}`;
 
   return (
     <div class="viz-inner">
       <div class="viz-message">
-        고리를 한 바퀴 돌면 <Tex>{W}</Tex> 가 <Tex>{dT}</Tex> 만큼 돌아간다. 고리 크기를 바꿔도 <Tex>{`${dT} \\div \\text{넓이}`}</Tex> 는 늘 <Tex>{`1/r^2`}</Tex> — 그것이 곡률이다. 도는 순서를 바꾸면 회전 방향이 뒤집힌다.
+        고리를 한 바퀴 돌면 <Tex>{W}</Tex> 가 <Tex>{dT}</Tex> 만큼 돌아간다. 고리 크기를 바꿔도 <Tex>{`${dT} \\div \\text{넓이}`}</Tex> 는 늘 <Tex>{`1/${Rr}^2`}</Tex> — 그것이 곡률이다. 도는 순서를 바꾸면 회전 방향이 뒤집힌다.
       </div>
       <canvas ref={canvasRef} />
       <div class="viz-formula">
         <div><Tex>{`${dT} = ${L.dTheta >= 0 ? '+' : '-'}${Math.abs(L.dTheta).toFixed(4)}\\ \\text{rad}`}</Tex>
           <span style={{ color: 'var(--fg-muted)', marginLeft: '0.6em', fontSize: '0.9em' }}>
-            ({uFirst ? '반시계, u 먼저' : '시계, v 먼저'})</span></div>
-        <div><Tex>{`\\text{넓이} = ${area.toFixed(4)}, \\qquad \\epsilon^2 = ${(eps * eps).toFixed(4)}`}</Tex></div>
-        <div><Tex>{`\\frac{|${dT}|}{\\text{넓이}} = ${ratio.toFixed(4)} \\qquad ${Kt} = \\frac{1}{r^2} = ${K.toFixed(4)}`}</Tex></div>
+            ({uFirst ? <span>반시계, <Tex>{u}</Tex> 먼저</span> : <span>시계, <Tex>{v}</Tex> 먼저</span>})</span></div>
+        <div><Tex>{`\\text{넓이} = ${area.toFixed(4)}, \\qquad ${Ep}^2 = ${(eps * eps).toFixed(4)}`}</Tex></div>
+        <div><Tex>{`\\frac{|${dT}|}{\\text{넓이}} = ${ratio.toFixed(4)} \\qquad ${Kt} = \\frac{1}{${Rr}^2} = ${K.toFixed(4)}`}</Tex></div>
         <div><Tex>{`${Rt}(${uFirst ? u : v}, ${uFirst ? v : u})${W} = -${Rt}(${uFirst ? v : u}, ${uFirst ? u : v})${W}`}</Tex>
           <span style={{ color: 'var(--fg-muted)', marginLeft: '0.6em', fontSize: '0.9em' }}>순서를 바꾸면 부호가 바뀐다</span></div>
       </div>
       <div class="viz-controls">
-        <Slider label={<span>고리 한 변 <Tex>{'\\epsilon'}</Tex></span>} min={0.1} max={1.0} step={0.01} value={eps} onChange={setEps} />
-        <Slider label={<span>구의 반지름 <Tex>{'r'}</Tex></span>} min={0.6} max={R_MAX} step={0.01} value={r} onChange={setR} />
-        <button class={'viz-btn' + (uFirst ? ' active' : '')} onClick={() => setUFirst(true)}>u 먼저</button>
-        <button class={'viz-btn' + (!uFirst ? ' active' : '')} onClick={() => setUFirst(false)}>v 먼저</button>
+        <Slider label={<span>고리 한 변 <Tex>{Ep}</Tex></span>} min={0.1} max={1.0} step={0.01} value={eps} onChange={setEps} />
+        <Slider label={<span>구의 반지름 <Tex>{Rr}</Tex></span>} min={0.6} max={R_MAX} step={0.01} value={r} onChange={setR} />
+        <button class={'viz-btn' + (uFirst ? ' active' : '')} onClick={() => setUFirst(true)}><Tex>{u}</Tex> 먼저</button>
+        <button class={'viz-btn' + (!uFirst ? ' active' : '')} onClick={() => setUFirst(false)}><Tex>{v}</Tex> 먼저</button>
       </div>
     </div>
   );

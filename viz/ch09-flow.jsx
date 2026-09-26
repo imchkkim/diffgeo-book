@@ -132,6 +132,7 @@ function Ch09Flow() {
   }
 
   const M = HEX.metric, Rc = HEX.scalar;
+  const Tt = `\\textcolor{${HEX.time}}{t}`, Rr = `\\textcolor{${HEX.radius}}{r}`, Nd = `\\textcolor{${HEX.dim}}{n}`;
   const T = tEnd(n), r2 = r2At(n, shown), Rv = (n * (n - 1)) / r2;
 
   return (
@@ -141,13 +142,13 @@ function Ch09Flow() {
       </div>
       <canvas ref={canvasRef} />
       <div class="viz-formula">
-        <div><Tex>{`\\frac{\\partial \\textcolor{${M}}{g}_{ij}}{\\partial t} = -2\\,\\textcolor{${HEX.ricci}}{R}_{ij} = -\\frac{2(n-1)}{r^2}\\,\\textcolor{${M}}{g}_{ij} \\;\\Rightarrow\\; r(t)^2 = 1 - ${2 * (n - 1)}t`}</Tex></div>
-        <div><Tex>{`t = ${shown.toFixed(3)}, \\quad r^2 = ${r2.toFixed(3)}, \\quad \\textcolor{${Rc}}{R} = \\frac{n(n-1)}{r^2} = ${Rv.toFixed(2)}, \\quad \\text{소멸 시각 } T = \\frac{1}{2(n-1)} = ${T.toFixed(3)}`}</Tex></div>
+        <div><Tex>{`\\frac{\\partial \\textcolor{${M}}{g}_{ij}}{\\partial ${Tt}} = -2\\,\\textcolor{${HEX.ricci}}{R}_{ij} = -\\frac{2(${Nd}-1)}{${Rr}^2}\\,\\textcolor{${M}}{g}_{ij} \\;\\Rightarrow\\; ${Rr}(${Tt})^2 = 1 - ${2 * (n - 1)}${Tt}`}</Tex></div>
+        <div><Tex>{`${Tt} = ${shown.toFixed(3)}, \\quad ${Rr}^2 = ${r2.toFixed(3)}, \\quad \\textcolor{${Rc}}{R} = \\frac{${Nd}(${Nd}-1)}{${Rr}^2} = ${Rv.toFixed(2)}, \\quad \\text{소멸 시각 } T = \\frac{1}{2(${Nd}-1)} = ${T.toFixed(3)}`}</Tex></div>
       </div>
       <div class="viz-controls">
         <button class="viz-btn" onClick={toggle}>{playing ? '멈춤' : '흐름 재생'}</button>
         <label class="viz-slider">
-          <span>시간 <Tex>t</Tex></span>
+          <span>시간 <Tex>{Tt}</Tex></span>
           <input type="range" min={0} max={T * 0.995} step={T / 500} value={shown}
             onInput={(e) => { playRef.current = false; setPlaying(false); setT(parseFloat(e.target.value)); }} />
         </label>

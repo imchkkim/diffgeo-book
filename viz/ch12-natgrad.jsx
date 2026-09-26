@@ -196,18 +196,18 @@ function Ch12Viz() {
           <Tex>{`(\\textcolor{${C}}{\\mu}, \\textcolor{${C}}{\\sigma}) = (${f(mu)},\\ ${f(s)}),\\quad \\textcolor{${Lc}}{L} = ${loss(mu, s).toFixed(3)}`}</Tex>
         </div>
         <div>
-          <Tex>{`\\sigma\\text{ 좌표: }\\ \\nabla\\textcolor{${Lc}}{L} = ${pair(g)},\\ \\ \\textcolor{${G}}{F} = \\mathrm{diag}(${f(1 / (s * s))},\\ ${f(2 / (s * s))})`}</Tex>
+          <Tex>{`\\textcolor{${C}}{\\sigma}\\text{ 좌표: }\\ \\nabla\\textcolor{${Lc}}{L} = ${pair(g)},\\ \\ \\textcolor{${G}}{F} = \\mathrm{diag}(${f(1 / (s * s))},\\ ${f(2 / (s * s))})`}</Tex>
           <span style={{ marginLeft: '1em' }}><Tex>{`\\textcolor{${G}}{F}^{-1}\\nabla\\textcolor{${Lc}}{L} = ${pair(n)}`}</Tex></span>
         </div>
         <div>
-          <Tex>{`\\log\\sigma\\text{ 좌표: }\\ \\nabla\\textcolor{${Lc}}{L} = ${pair(gl)},\\ \\ \\textcolor{${G}}{F} = \\mathrm{diag}(${f(1 / (s * s))},\\ 2)`}</Tex>
+          <Tex>{`\\log\\textcolor{${C}}{\\sigma}\\text{ 좌표: }\\ \\nabla\\textcolor{${Lc}}{L} = ${pair(gl)},\\ \\ \\textcolor{${G}}{F} = \\mathrm{diag}(${f(1 / (s * s))},\\ 2)`}</Tex>
           <span style={{ marginLeft: '1em' }}><Tex>{`\\textcolor{${G}}{F}^{-1}\\nabla\\textcolor{${Lc}}{L} = ${pair(nl)}`}</Tex></span>
         </div>
         <div>
           <Tex>{`\\text{자연 경사를 옮기면: } ${f(n[1])} \\div \\textcolor{${C}}{\\sigma} = ${f(n[1] / s)} = ${f(nl[1])}\\ \\ (\\text{일치})`}</Tex>
         </div>
         <div>
-          <Tex>{`\\text{보통 경사를 옮기면: } ${f(g[1])} \\div \\textcolor{${C}}{\\sigma} = ${f(g[1] / s)} ${Math.abs(g[1] / s - gl[1]) < 0.005 ? '= ' + f(gl[1]) + '\\ \\ (\\sigma = 1\\text{ 에서만 우연히 같음})' : '\\neq ' + f(gl[1]) + '\\ \\ (\\text{불일치})'}`}</Tex>
+          <Tex>{`\\text{보통 경사를 옮기면: } ${f(g[1])} \\div \\textcolor{${C}}{\\sigma} = ${f(g[1] / s)} ${Math.abs(g[1] / s - gl[1]) < 0.005 ? '= ' + f(gl[1]) + '\\ \\ (\\textcolor{' + C + '}{\\sigma} = 1\\text{ 에서만 우연히 같음})' : '\\neq ' + f(gl[1]) + '\\ \\ (\\text{불일치})'}`}</Tex>
         </div>
       </div>
       <div class="viz-controls">
@@ -215,8 +215,8 @@ function Ch12Viz() {
         <button class="viz-btn" onClick={() => setStart([-1, 2.2])}>(−1, 2.2)</button>
         <button class="viz-btn" onClick={() => setStart([3.3, 0.25])}>(3.3, 0.25)</button>
         <span style={{ fontSize: '0.85em', color: 'var(--fg-muted)' }}>
-          {legend('1.6px solid var(--fg)', 'σ 좌표의 보통 경사')}
-          {legend('2px dashed var(--fg-muted)', 'log σ 좌표의 보통 경사')}
+          {legend('1.6px solid var(--fg)', <span><Tex>{`\\textcolor{${C}}{\\sigma}`}</Tex> 좌표의 보통 경사</span>)}
+          {legend('2px dashed var(--fg-muted)', <span><Tex>{`\\log\\textcolor{${C}}{\\sigma}`}</Tex> 좌표의 보통 경사</span>)}
           {legend(`4px solid ${pal.metric}`, '자연 경사 (두 좌표 모두)')}
           · 평면을 눌러 출발점 옮기기 · 점 = 최솟값 (2, 1)
         </span>

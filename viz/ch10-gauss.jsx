@@ -137,6 +137,7 @@ function Ch10Gauss() {
   });
 
   const Th = HEX.coord, Et = HEX.dualcoord, Cn = HEX.conn, D = HEX.dual;
+  const Tt = `\\textcolor{${HEX.time}}{t}`;
   const p = P.current, q = Q.current, e = eAt(p, q, t), m = mAt(p, q, t), lc = lcAt(p, q, t);
   const N = ([mu, s]) => `N(${mu.toFixed(2)},\\ ${(s * s).toFixed(2)})`;
   const th = toTheta(e), et = toEta(m);
@@ -148,12 +149,12 @@ function Ch10Gauss() {
       </div>
       <canvas ref={canvasRef} />
       <div class="viz-formula">
-        <div><Tex>{`\\textcolor{${Cn}}{\\text{e}}: \\textcolor{${Th}}{\\theta} = (1-t)\\textcolor{${Th}}{\\theta}_P + t\\,\\textcolor{${Th}}{\\theta}_Q = (${th[0].toFixed(3)},\\ ${th[1].toFixed(3)}) \\;\\Rightarrow\\; ${N(e)}`}</Tex></div>
-        <div><Tex>{`\\textcolor{${D}}{\\text{m}}: \\textcolor{${Et}}{\\eta} = (1-t)\\textcolor{${Et}}{\\eta}_P + t\\,\\textcolor{${Et}}{\\eta}_Q = (${et[0].toFixed(3)},\\ ${et[1].toFixed(3)}) \\;\\Rightarrow\\; ${N(m)}`}</Tex></div>
+        <div><Tex>{`\\textcolor{${Cn}}{\\text{e}}: \\textcolor{${Th}}{\\theta} = (1-${Tt})\\textcolor{${Th}}{\\theta}_P + ${Tt}\\,\\textcolor{${Th}}{\\theta}_Q = (${th[0].toFixed(3)},\\ ${th[1].toFixed(3)}) \\;\\Rightarrow\\; ${N(e)}`}</Tex></div>
+        <div><Tex>{`\\textcolor{${D}}{\\text{m}}: \\textcolor{${Et}}{\\eta} = (1-${Tt})\\textcolor{${Et}}{\\eta}_P + ${Tt}\\,\\textcolor{${Et}}{\\eta}_Q = (${et[0].toFixed(3)},\\ ${et[1].toFixed(3)}) \\;\\Rightarrow\\; ${N(m)}`}</Tex></div>
         <div><Tex>{`\\text{레비-치비타 (피셔 계량의 측지선)}: ${N(lc)}`}</Tex></div>
       </div>
       <div class="viz-controls">
-        <Slider label={<Tex>t</Tex>} min={0} max={1} step={0.01} value={t} onChange={setT} />
+        <Slider label={<Tex>{Tt}</Tex>} min={0} max={1} step={0.01} value={t} onChange={setT} />
         <button class="viz-btn" onClick={() => { P.current = [-2, 1]; Q.current = [2, 1]; refresh(); }}>N(−2,1) ↔ N(2,1)</button>
         <button class="viz-btn" onClick={() => { P.current = [-1, 0.5]; Q.current = [2, 2]; refresh(); }}>N(−1,0.25) ↔ N(2,4)</button>
         <span style={{ color: 'var(--fg-muted)', fontSize: '0.85em' }}>P, Q 를 끌어 옮기기</span>

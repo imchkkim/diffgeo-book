@@ -129,6 +129,7 @@ function Ch09Viz() {
   const canvasRef = useCanvas(drawRef);
 
   const Kc = HEX.gauss, Rc = HEX.scalar;
+  const Ep = `\\textcolor{${HEX.eps}}{\\epsilon}`;
   const exact = areaK(K, e), approx = areaApprox(K, e), flat = Math.PI * e * e;
   const errPct = Math.abs(approx - exact) / exact * 100;
 
@@ -140,13 +141,13 @@ function Ch09Viz() {
       <canvas ref={canvasRef} />
       <div class="viz-formula">
         <div><Tex>{`\\textcolor{${Rc}}{R} = 2\\textcolor{${Kc}}{K} = ${(2 * K).toFixed(2)}`}</Tex><span style={{ color: 'var(--fg-muted)', marginLeft: '0.6em', fontSize: '0.9em' }}>2차원 곡면에서</span></div>
-        <div><Tex>{`\\text{정확한 넓이} = ${exact.toFixed(4)}, \\qquad \\pi\\epsilon^2 = ${flat.toFixed(4)}`}</Tex></div>
-        <div><Tex>{`\\pi\\epsilon^2\\left(1 - \\frac{\\textcolor{${Rc}}{R}}{24}\\epsilon^2\\right) = ${flat.toFixed(4)} \\times (1 ${-2 * K * e * e / 24 >= 0 ? '+' : '-'} ${Math.abs(2 * K * e * e / 24).toFixed(4)}) = ${approx.toFixed(4)}`}</Tex></div>
+        <div><Tex>{`\\text{정확한 넓이} = ${exact.toFixed(4)}, \\qquad \\pi${Ep}^2 = ${flat.toFixed(4)}`}</Tex></div>
+        <div><Tex>{`\\pi${Ep}^2\\left(1 - \\frac{\\textcolor{${Rc}}{R}}{24}${Ep}^2\\right) = ${flat.toFixed(4)} \\times (1 ${-2 * K * e * e / 24 >= 0 ? '+' : '-'} ${Math.abs(2 * K * e * e / 24).toFixed(4)}) = ${approx.toFixed(4)}`}</Tex></div>
         <div style={{ color: 'var(--fg-muted)', fontSize: '0.9em' }}>근사의 상대 오차 {errPct.toFixed(2)}%</div>
       </div>
       <div class="viz-controls">
         <Slider label={<Tex>{`\\textcolor{${Kc}}{K}`}</Tex>} min={-1.5} max={1.5} step={0.01} value={K} onChange={setK} />
-        <Slider label={<Tex>{`\\epsilon`}</Tex>} min={0.1} max={2.5} step={0.01} value={e} onChange={setEps} />
+        <Slider label={<Tex>{Ep}</Tex>} min={0.1} max={2.5} step={0.01} value={e} onChange={setEps} />
       </div>
     </div>
   );

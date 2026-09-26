@@ -114,5 +114,75 @@
     "light": "#7b1fa2",
     "dark": "#ce93d8",
     "label": "비틀림 텐서 T"
+  },
+  "time": {
+    "light": "#6a7a00",
+    "dark": "#9eb319",
+    "label": "시각·곡선 매개변수 t (구간 끝 a, b)"
+  },
+  "radius": {
+    "light": "#0561ff",
+    "dark": "#558be7",
+    "label": "반지름 (길이 상수) R, r"
+  },
+  "dim": {
+    "light": "#c4724f",
+    "dark": "#c77857",
+    "label": "차원 n"
+  },
+  "eps": {
+    "light": "#b95b64",
+    "dark": "#c5777f",
+    "label": "0으로 보내는 작은 길이 ε"
+  },
+  "area": {
+    "light": "#f320e5",
+    "dark": "#e548da",
+    "label": "넓이 요소 dA"
+  },
+  "arclen": {
+    "light": "#6314ff",
+    "dark": "#9d75eb",
+    "label": "곡선을 따라 잰 길이 L, s"
+  },
+  "manifold": {
+    "light": "#0098c7",
+    "dark": "#1b99c0",
+    "label": "공간(곡면·매니폴드) 이름 M"
+  },
+  "obs": {
+    "light": "#007a72",
+    "dark": "#19b3a8",
+    "label": "관측값 x"
+  },
+  "aux1": {
+    "light": "#966b40",
+    "dark": "#b48250",
+    "label": "보조 팔레트 1 (절 한정)"
+  },
+  "aux2": {
+    "light": "#3c7b8b",
+    "dark": "#4a97ab",
+    "label": "보조 팔레트 2 (절 한정)"
+  },
+  "aux3": {
+    "light": "#ff4314",
+    "dark": "#e46444",
+    "label": "보조 팔레트 3 (절 한정)"
+  },
+  "aux4": {
+    "light": "#964079",
+    "dark": "#c270a6",
+    "label": "보조 팔레트 4 (절 한정)"
+  },
+  "aux5": {
+    "light": "#007a52",
+    "dark": "#19b380",
+    "label": "보조 팔레트 5 (절 한정)"
+  },
+  "aux6": {
+    "light": "#6b672e",
+    "dark": "#969040",
+    "label": "보조 팔레트 6 (절 한정)"
   }
 }

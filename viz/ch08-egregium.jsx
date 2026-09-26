@@ -112,7 +112,7 @@ function Ch08Viz() {
       <div class="viz-formula">
         <div><Tex>{`${Kt} = ${a1}\\,${a2} = (${f(k1)})(${f(k2)}) = ${f(K)}`}</Tex></div>
         <div><Tex>{`\\frac{C(\\rho)}{2\\pi\\rho} \\approx 1 - \\frac{${Kt}\\rho^2}{6} = ${ratio.toFixed(4)} \\quad (\\rho = ${RHO})`}</Tex></div>
-        <div style={{ fontSize: '0.92em' }}>{verdict}{paper && ' (종이 모드: K = 0 유지)'}</div>
+        <div style={{ fontSize: '0.92em' }}>{verdict}{paper && <span> (종이 모드: <Tex>{Kt}</Tex> = 0 유지)</span>}</div>
       </div>
       <div class="viz-controls">
         <Slider label={<Tex>{a1}</Tex>} min={-1.5} max={1.5} step={0.01} value={k1} onChange={changeK1} />
