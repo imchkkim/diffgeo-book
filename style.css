@@ -26,7 +26,7 @@
 
 html { scroll-behavior: smooth; }
 body {
-  font-family: 'Pretendard', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Pretendard Variable', 'Pretendard', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
   background: var(--bg);
   color: var(--fg);
   line-height: 1.8;
@@ -271,29 +271,52 @@ h3 + p > img:only-child {
 .viz-btn.active { border-color: var(--accent); color: var(--accent); }
 .viz-stage { position: relative; }
 
-/* ===== 따라 계산해 보기 / 연습문제 ===== */
-.worked, .exercises {
+/* ===== 따라 계산해 보기 ===== */
+.worked {
   margin: 1.8em 0;
   padding: 1em 1.3em;
   border-left: 4px solid var(--accent);
   background: var(--bg-code);
   border-radius: 0 8px 8px 0;
 }
-.worked > :first-child, .exercises > :first-child { margin-top: 0; }
-.exercises ol { padding-left: 1.4em; }
-.exercises li { margin: 0.6em 0; }
-.exercises .level {
-  display: inline-block;
-  font-size: 0.75em;
-  padding: 0 0.5em;
-  margin-right: 0.4em;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  color: var(--fg-muted);
-  vertical-align: 0.1em;
-}
+.worked > :first-child { margin-top: 0; }
 details.answer { margin: 0.4em 0 0.2em; font-size: 0.95em; }
 details.answer summary { cursor: pointer; color: var(--accent); }
+
+/* ===== 연습문제 본문: 테마와 관계없이 시험지처럼 흰 바탕에 검은 굵은 글씨 =====
+   규격 원본: ~/.claude/skills/textbook-exercises/SKILL.md 「B. 표현」.
+   수식 기호 색은 build.cjs 가 .exercises 안에서 라이트 값으로 고정한다(다크에서도 흰 바탕이라). */
+.exercises {
+  margin: 1em 0 1.4em;
+  padding: 0.9em 1.2em;
+  background: #fff;
+  color: #111;
+  border: 1.5px solid #222;
+  border-radius: 4px;
+  font-size: 1.12em;
+  font-weight: 600;
+  line-height: 1.75;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+[data-theme="dark"] .exercises { box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5); }
+.exercises > :first-child { margin-top: 0; }
+.exercises > :last-child { margin-bottom: 0; }
+.exercises strong { font-weight: 800; }
+.exercises code { background: #eee; color: #111; }
+.exercises ol { padding-left: 1.4em; }
+.exercises li { margin: 0.6em 0; }
+/* 레벨 뱃지(확인/계산/킬러): 흰 바탕 위라 색을 고정한다 */
+.exercises .level {
+  display: inline-block;
+  font-size: 0.7em;
+  font-weight: 600;
+  padding: 0 0.55em;
+  margin-right: 0.4em;
+  border: 1px solid #888;
+  border-radius: 999px;
+  color: #444;
+  vertical-align: 0.15em;
+}
 
 /* ===== 같이 풀기 세션 (대화) ===== */
 .exercises + h4 {
@@ -303,11 +326,9 @@ details.answer summary { cursor: pointer; color: var(--accent); }
   letter-spacing: 0.02em;
 }
 .exercises + h4::before { content: "💬 "; }
-.dialogue {
-  --who-T: #243b61; --who-M: #4d5763; --who-S: #3c6e4b;
-  margin: 1.5em 0 2em;
-}
-[data-theme="dark"] .dialogue { --who-T: #8fa9d6; --who-M: #b4bac1; --who-S: #8cc59c; }
+.dialogue, .turn { --who-T: #243b61; --who-M: #4d5763; --who-S: #3c6e4b; }
+.dialogue { margin: 1.5em 0 2em; }
+[data-theme="dark"] :is(.dialogue, .turn) { --who-T: #8fa9d6; --who-M: #b4bac1; --who-S: #8cc59c; }
 .turn {
   display: flex;
   gap: 0.9em;
@@ -320,9 +341,9 @@ details.answer summary { cursor: pointer; color: var(--accent); }
   padding: 0.55em 0.95em;
   border-radius: 10px;
   background: var(--bg-code);
-  border-left: 3px solid var(--who, var(--border));
 }
-.turn-body p { margin: 0; }
+.turn-body p { margin: 0; font-weight: 350; }
+.turn-body strong { font-weight: 600; }
 .turn-T { --who: var(--who-T); }
 .turn-M { --who: var(--who-M); }
 .turn-S { --who: var(--who-S); }
@@ -346,6 +367,15 @@ details.answer summary { cursor: pointer; color: var(--accent); }
   border: 1px solid var(--border);
   float: none; box-shadow: none; max-width: none;
 }
+/* 화자 이름은 표정 그림 아래에 */
+.cast figcaption {
+  margin-top: 0.25em;
+  text-align: center;
+  font-size: 0.8em;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--who);
+}
 .cast-slot {
   width: 88px; height: 88px;
   display: flex; flex-direction: column;
@@ -362,9 +392,9 @@ details.answer summary { cursor: pointer; color: var(--accent); }
 /* 대화 사이의 수식·그림은 말풍선 폭에 맞춘다 */
 .dialogue > :not(.turn):not(h3):not(h4) { margin-left: calc(88px + 0.9em); }
 @media (max-width: 600px) {
-  .cast, .cast-slot { flex-basis: 56px; width: 56px; height: 56px; }
+  .cast, .cast-slot { flex-basis: 56px; width: 56px; }
   .cast img { width: 56px; }
-  .cast-slot { font-size: 0.7em; }
+  .cast-slot { height: 56px; font-size: 0.7em; }
   .dialogue > :not(.turn):not(h3):not(h4) { margin-left: 0; }
 }
 
@@ -526,6 +556,16 @@ pre.mermaid {
   text-decoration: none;
 }
 .chapter-nav-next { text-align: right; margin-left: auto; }
+.page-count { font-size: 0.85em; color: var(--fg-muted); white-space: nowrap; }
+
+/* ===== 절 단위 페이지 ===== */
+.chapter-crumb { margin: 0 0 0.4em; font-size: 0.85em; }
+.chapter-crumb a { color: var(--fg-muted); }
+.chapter-paged > h2:first-of-type { margin-top: 0.4em; }
+.chapter-paged > .chapter-crumb + h2 { margin-top: 0.4em; }
+.sidebar-toc { list-style: none; padding: 0.1em 0 0.4em 0.8em; margin: 0 0 0 0.6em; border-left: 2px solid var(--border); }
+#sidebar .sidebar-toc a { font-size: 0.8em; padding: 0.2em 0.5em; color: var(--fg-muted); }
+#sidebar .sidebar-toc a.current { color: var(--accent); font-weight: 600; }
 
 /* ===== TOC Page ===== */
 .toc-page { padding-top: 1rem; }

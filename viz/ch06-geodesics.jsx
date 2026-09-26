@@ -1,6 +1,6 @@
-// 6장 — 대원(측지선) vs 등각항로(메르카토르 위 직선).
-// 경로 위 한 점에서 측지선 방정식의 두 항을 수치로 계산해, 대원에서는 합이 0, 등각항로에서는 0이 아님을 보인다.
-// 색: 곡선 γ(대원) = curve, 크리스토펠 항 = conn, 등각항로 = 회색 점선 (palette.json).
+// 6장 — 대원(측지선) vs 항정선(메르카토르 위 직선).
+// 경로 위 한 점에서 측지선 방정식의 두 항을 수치로 계산해, 대원에서는 합이 0, 항정선에서는 0이 아님을 보인다.
+// 색: 곡선 γ(대원) = curve, 크리스토펠 항 = conn, 항정선 = 회색 점선 (palette.json).
 import { render } from 'preact';
 import { useState, useRef, useMemo } from 'preact/hooks';
 import { useCanvas, usePointer } from './shared/canvas-utils.jsx';
@@ -35,7 +35,7 @@ function makePaths(a, b) {
   const Q = B.map((v, i) => (v - d * A[i]) / Math.sin(w));
   const gc = (s) => A.map((v, i) => Math.cos(s) * v + Math.sin(s) * Q[i]);
 
-  // 등각항로: 메르카토르에서 직선 (경도 차는 그대로, 날짜변경선 넘기지 않음)
+  // 항정선: 메르카토르에서 직선 (경도 차는 그대로, 날짜변경선 넘기지 않음)
   const dLon = b.lon - a.lon, dY = mercY(b.lat) - mercY(a.lat);
   const al = Math.atan2(dLon, dY); // 북쪽에서 잰 방위각
   let rh, rhLen;
@@ -178,7 +178,7 @@ function Ch06Viz() {
   const G = HEX.curve, CN = HEX.conn;
   const f = (v) => (Math.abs(v) < 5e-4 ? '0.000' : v.toFixed(3));
   const table = terms && `\\begin{array}{lrr}
- & \\text{대원} & \\text{등각항로} \\\\ \\hline
+ & \\text{대원} & \\text{항정선} \\\\ \\hline
 \\ddot{\\textcolor{${G}}{\\theta}} & ${f(terms.gc.tdd)} & ${f(terms.rh.tdd)} \\\\
 \\textcolor{${CN}}{\\Gamma}^\\theta_{\\phi\\phi}\\,\\dot{\\textcolor{${G}}{\\phi}}^2 & ${f(terms.gc.gT)} & ${f(terms.rh.gT)} \\\\
 \\text{합 (}\\theta\\text{ 식)} & \\mathbf{${f(terms.gc.sT)}} & \\mathbf{${f(terms.rh.sT)}} \\\\ \\hline
@@ -191,7 +191,7 @@ function Ch06Viz() {
   return (
     <div class="viz-inner">
       <div class="viz-message">
-        대원 위에서는 좌표 가속도와 <Tex>{`\\textcolor{${CN}}{\\Gamma}`}</Tex> 항이 매 순간 정확히 상쇄되어 합이 0이다. 지도 위의 직선(등각항로)은 합이 0이 아니라서, 따라가려면 계속 핸들을 꺾어야 한다.
+        대원 위에서는 좌표 가속도와 <Tex>{`\\textcolor{${CN}}{\\Gamma}`}</Tex> 항이 매 순간 정확히 상쇄되어 합이 0이다. 지도 위의 직선(항정선)은 합이 0이 아니라서, 따라가려면 계속 핸들을 꺾어야 한다.
       </div>
       <canvas ref={canvasRef} />
       <div class="viz-formula">
@@ -216,7 +216,7 @@ function Ch06Viz() {
         </label>
         <Slider label="지점" min={0.05} max={0.95} step={0.01} value={frac} onChange={setFrac} />
         <span style={{ fontSize: '0.85em', color: 'var(--fg-muted)' }}>
-          <span style={{ color: pal.curve, fontWeight: 700 }}>━</span> 대원(측지선) · <span style={{ fontWeight: 700 }}>┅</span> 등각항로(지도 위 직선)
+          <span style={{ color: pal.curve, fontWeight: 700 }}>━</span> 대원(측지선) · <span style={{ fontWeight: 700 }}>┅</span> 항정선(지도 위 직선)
         </span>
       </div>
     </div>
