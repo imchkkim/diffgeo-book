@@ -33,7 +33,7 @@ cp -r "$BOOK/dist" "$DIR"
 git add -A -- "$DIR"
 
 # 4. 스테이징 검사: diffgeo-book/ 밖이 하나라도 있으면 중단
-outside=$(git diff --cached --name-only | grep -v "^$DIR/" || true)
+outside=$(git -c core.quotepath=false diff --cached --name-only | grep -v "^$DIR/" || true)
 if [ -n "$outside" ]; then
   echo "중단: $DIR/ 밖의 파일이 스테이징됨:" >&2; echo "$outside" >&2
   git reset -q -- $outside
