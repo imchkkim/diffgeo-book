@@ -359,7 +359,7 @@ details.answer summary { cursor: pointer; color: var(--accent); }
 }
 .cast img {
   width: 88px; height: auto;
-  aspect-ratio: 400 / 460;
+  aspect-ratio: 1 / 1;
   object-fit: contain;
   background: #fff;
   margin: 0;

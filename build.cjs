@@ -120,7 +120,7 @@ const exercisePaletteCss =
 const appCss = fs.readFileSync(path.join(SRC, "style.css"), "utf-8") + "\n" + paletteCss() + "\n" + exercisePaletteCss;
 
 // ── 대화: "**김민준 〔M04〕:** …" 문단을 말풍선 차례로 바꾼다 ──
-// 〔인덱스〕가 있는 차례에만 인물 표정 그림(images/cast/<인덱스>.svg)을 둔다. 파일이 없으면 빈 자리 표시.
+// 〔인덱스〕가 있는 차례에만 인물 표정 그림(images/cast/<인덱스>.webp)을 둔다. 파일이 없으면 빈 자리 표시.
 // 표정 그림 원본은 교재 공용 폴더(~/lameproof/shared/characters/assets). 책 안에 사본을 두지 않고 빌드 때 dist 로 복사한다.
 const CAST_DIR = path.join(os.homedir(), "lameproof", "shared", "characters", "assets");
 if (fs.existsSync(CAST_DIR)) {
