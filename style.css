@@ -153,6 +153,13 @@ img {
   border-radius: 6px;
 }
 
+/* 다크 모드: 투명 바탕 그림(SVG·PNG)은 검은 선·글자가 어두운 바탕에 묻히므로 흰 판 위에 올린다 */
+[data-theme="dark"] img[src$=".svg"],
+[data-theme="dark"] img[src$=".png"] {
+  background: #fff;
+  padding: 0.5em;
+}
+
 /* Portrait images in 핵심 인물과 일화 sections */
 h3 + p > img:only-child {
   max-width: 200px;
