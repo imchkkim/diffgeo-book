@@ -435,18 +435,15 @@ pre.mermaid {
   padding: 1em 0;
 }
 
-/* ===== Theme Toggle ===== */
+/* ===== Theme Toggle (목차 머리 안) ===== */
 #theme-toggle {
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
-  z-index: 1000;
   background: var(--bg-code);
   border: 1px solid var(--border);
   border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  font-size: 1.2em;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  font-size: 1em;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -480,6 +477,7 @@ pre.mermaid {
   border-bottom: 1px solid var(--border);
 }
 .sidebar-header h2 { font-size: 1.1rem; margin: 0; border: none; padding: 0; }
+.sidebar-actions { display: flex; align-items: center; gap: 0.4rem; }
 
 #sidebar-close {
   background: none;
@@ -513,7 +511,7 @@ pre.mermaid {
 #sidebar-open {
   position: fixed;
   top: 1rem;
-  left: 1rem;
+  right: 1rem;
   z-index: 998;
   background: var(--bg-code);
   border: 1px solid var(--border);

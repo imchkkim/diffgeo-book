@@ -284,12 +284,13 @@ function buildPage({ pageTitle, sidebarActiveSlug, activeFile, bodyContent, vizS
 </head>
 <body>
 
-<button id="theme-toggle" aria-label="다크모드 전환">&#x1F319;</button>
-
 <nav id="sidebar">
   <div class="sidebar-header">
     <h2><a href="index.html" style="color:inherit;text-decoration:none">목차</a></h2>
-    <button id="sidebar-close" aria-label="사이드바 닫기">&times;</button>
+    <div class="sidebar-actions">
+      <button id="theme-toggle" aria-label="다크모드 전환">&#x1F319;</button>
+      <button id="sidebar-close" aria-label="사이드바 닫기">&times;</button>
+    </div>
   </div>
   <ol>${tocHtml}</ol>
 </nav>
