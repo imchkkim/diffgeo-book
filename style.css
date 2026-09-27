@@ -269,6 +269,17 @@ h3 + p > img:only-child {
 }
 .viz-btn:hover { border-color: var(--accent); }
 .viz-btn.active { border-color: var(--accent); color: var(--accent); }
+/* 위젯의 숫자 입력칸 — 연습문제 값을 직접 넣어 풀이와 비교 */
+.viz-inputs { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.5em; color: var(--fg-muted); }
+.viz-num {
+  width: 4.2em;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.15em 0.3em;
+  font: inherit;
+}
 .viz-stage { position: relative; }
 
 /* ===== 따라 계산해 보기 ===== */

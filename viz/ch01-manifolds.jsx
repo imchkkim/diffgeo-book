@@ -71,6 +71,8 @@ function Ch01Viz() {
   const rot = useRef({ y: -0.5, x: 0.35 });
   const drag = useRef(null);
   const [readP, setReadP] = useState(PRESETS[0].p);
+  const [inp, setInp] = useState(['0.6', '0', '0.8']);
+  const [inpNote, setInpNote] = useState('');
   const pending = useRef(false);
 
   // 수식 패널은 프레임당 한 번만 갱신
@@ -251,6 +253,16 @@ function Ch01Viz() {
     setPoint(d.kind === 'N' ? invN(u) : invS(u));
   }
 
+  // 문제 2 풀이 비교용: (X, Y, Z) 를 직접 넣어 점을 찍는다. 단위구 밖이면 단위구로 끌어당긴다.
+  function applyInput() {
+    const q = inp.map(v => parseFloat(v));
+    if (q.some(v => !isFinite(v))) { setInpNote('숫자 세 개를 넣어 주세요'); return; }
+    const n = Math.hypot(...q);
+    if (n === 0) { setInpNote('(0, 0, 0)은 구면 위의 점이 아닙니다'); return; }
+    setInpNote(Math.abs(n - 1) > 1e-3 ? `길이가 ${n.toFixed(3)}이라 단위구 위로 옮겼습니다` : '');
+    setPoint(q.map(v => v / n));
+  }
+
   // ── 수식 패널 ──
   const C = HEX.coord, H = HEX.chart;
   const uN = phiN(readP), uS = phiS(readP);
@@ -283,6 +295,15 @@ function Ch01Viz() {
         {PRESETS.map(pr => (
           <button class="viz-btn" onClick={() => setPoint(pr.p)}>{pr.label}</button>
         ))}
+        <span class="viz-inputs">
+          {['X', 'Y', 'Z'].map((nm, i) => (
+            <label>{nm} <input class="viz-num" type="number" step="0.1" value={inp[i]}
+              onInput={(e) => { const v = inp.slice(); v[i] = e.target.value; setInp(v); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') applyInput(); }} /></label>
+          ))}
+          <button class="viz-btn" onClick={applyInput}>이 점 찍기</button>
+          {inpNote && <span style={{ color: 'var(--fg-muted)', fontSize: '0.85em' }}>{inpNote}</span>}
+        </span>
         <span style={{ color: 'var(--fg-muted)', fontSize: '0.85em' }}>평면에서 점을 끌기 · 구면을 끌어 회전 · 회색 음영 = 북반구 · 점선 = 적도</span>
       </div>
     </div>
