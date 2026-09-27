@@ -156,7 +156,7 @@ function Ch02Viz() {
   return (
     <div class="viz-inner">
       <div class="viz-message">
-        성분 <Tex>{`(\\textcolor{${D}}{v^{\\theta}}, \\textcolor{${D}}{v^{\\phi}})`}</Tex>는 그대로 두고 점을 북극 쪽으로 옮겨 보자. <Tex>{`\\textcolor{${D}}{\\partial_\\phi}`}</Tex>가 짧아지므로 같은 성분이 더 느린 속도를 뜻한다. 속도 화살표는 언제나 그 점의 접평면 안에 있다.
+        성분 <Tex>{`(\\textcolor{${D}}{v^{\\theta}}, \\textcolor{${D}}{v^{\\phi}})`}</Tex>는 그대로 두고 점을 북극 쪽으로 옮겨 보자. <Tex>{`\\textcolor{${D}}{\\partial_\\phi}`}</Tex>가 짧아지므로 같은 성분이 더 느린 속도를 뜻한다. 속도 화살표는 언제나 그 점의 접선공간 안에 있다.
       </div>
       <canvas ref={canvasRef} />
       <div class="viz-formula">

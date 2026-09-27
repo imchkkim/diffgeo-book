@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
+const crypto = require("crypto");
 const markdownit = require("markdown-it");
 const texmath = require("markdown-it-texmath");
 const katex = require("katex");
@@ -43,6 +44,40 @@ md.use(texmath, {
   katexOptions: { throwOnError: false, trust: true },
 });
 
+// 표는 가로 스크롤 상자로 감싼다 — 휴대폰 폭에서 넓은 표만 옆으로 밀어 보고, 쪽 전체가 가로로 밀리지 않게
+md.renderer.rules.table_open = () => '<div class="table-wrap"><table>\n';
+md.renderer.rules.table_close = () => '</table></div>\n';
+
+// 그림: 그림만으로 된 문단(![설명](파일) 한 줄, 또는 여러 장을 한 줄에)은 문단 대신 그림 상자로 그린다.
+//   개념 그림 → <figure class="fig"><img><figcaption>설명(수식도 그림)</figcaption></figure>
+//   초상     → <figure class="fig fig-portrait"><img></figure> — 설명 줄 없이 대체 글(alt)로만. 오른쪽에 작게 띄운다
+// 초상을 가르는 기준: 「### 역사: …」 소제목 바로 다음에 놓인 그림 문단. (저자 결정 2026-09-27: 개념 그림만 설명을 보인다)
+const isImageParagraph = (inline) =>
+  inline && inline.type === "inline" && inline.children.some((t) => t.type === "image") &&
+  inline.children.every((t) => t.type === "image" || t.type === "softbreak" || (t.type === "text" && !t.content.trim()));
+const afterHistoryHeading = (tokens, idx) =>
+  idx >= 2 && tokens[idx - 1].type === "heading_close" && tokens[idx - 1].tag === "h3" && /^역사\s*:/.test(tokens[idx - 2].content);
+const defaultParagraphOpen = md.renderer.rules.paragraph_open || ((tokens, idx, options, env, self) => self.renderToken(tokens, idx, options));
+const defaultParagraphClose = md.renderer.rules.paragraph_close || ((tokens, idx, options, env, self) => self.renderToken(tokens, idx, options));
+md.renderer.rules.paragraph_open = (tokens, idx, options, env, self) => {
+  const inline = tokens[idx + 1];
+  if (!isImageParagraph(inline)) return defaultParagraphOpen(tokens, idx, options, env, self);
+  const portrait = afterHistoryHeading(tokens, idx);
+  for (const t of inline.children) if (t.type === "image") t.meta = { ...(t.meta || {}), figure: portrait ? "portrait" : "fig" };
+  tokens[idx + 2].meta = { ...(tokens[idx + 2].meta || {}), figure: true };
+  return "";
+};
+md.renderer.rules.paragraph_close = (tokens, idx, options, env, self) =>
+  tokens[idx].meta && tokens[idx].meta.figure ? "\n" : defaultParagraphClose(tokens, idx, options, env, self);
+const defaultImage = md.renderer.rules.image;
+md.renderer.rules.image = (tokens, idx, options, env, self) => {
+  const t = tokens[idx];
+  const img = defaultImage(tokens, idx, options, env, self);
+  if (!t.meta || !t.meta.figure) return img;
+  if (t.meta.figure === "portrait") return `<figure class="fig fig-portrait">${img}</figure>`;
+  return `<figure class="fig">${img}<figcaption>${self.renderInline(t.children, options, env)}</figcaption></figure>`;
+};
+
 // Custom renderer: fenced code blocks with language "mermaid" → <pre class="mermaid">
 const defaultFence =
   md.renderer.rules.fence ||
@@ -63,7 +98,8 @@ fs.mkdirSync(DIST, { recursive: true });
 // 절 페이지 수가 바뀌면 옛 페이지가 남으므로 최상위 html 은 비우고 다시 쓴다
 for (const f of fs.readdirSync(DIST)) if (f.endsWith(".html")) fs.rmSync(path.join(DIST, f));
 
-// Read KaTeX CSS from node_modules (in CWD, i.e. /tmp/diffgeo-build)
+// KaTeX CSS·글꼴은 실행한 폴더(cwd)의 node_modules 에서 읽는다: 로컬 빌드는 저장소 루트,
+// 공용 배포 도구(~/lameproof/lib/build.cjs)는 npm ci 를 돌린 임시 폴더에서 이 파일을 실행한다
 const katexCssPath = path.join(process.cwd(), "node_modules", "katex", "dist", "katex.min.css");
 const katexCss = fs.readFileSync(katexCssPath, "utf-8");
 
@@ -85,7 +121,7 @@ if (fs.existsSync(imgSrc)) {
 // Compile viz JSX bundles
 const vizSrc = path.join(SRC, "viz");
 const vizDst = path.join(DIST, "viz");
-const vizBundles = new Set();
+const vizBundles = new Map(); // 위젯 이름 → 내용 해시
 if (fs.existsSync(vizSrc)) {
   const vizFiles = fs.readdirSync(vizSrc).filter(f => f.startsWith("ch") && f.endsWith(".jsx"));
   if (vizFiles.length > 0) {
@@ -105,7 +141,10 @@ if (fs.existsSync(vizSrc)) {
       nodePaths: [path.join(SRC, "node_modules")],
     });
     for (const vf of vizFiles) {
-      vizBundles.add(vf.replace(".jsx", ""));
+      const id = vf.replace(".jsx", "");
+      // 캐시 무효화용 내용 해시 — 옛 입구 파일이 캐시에 남아 사라진 공통 청크를 가리키지 않게 주소에 붙인다.
+      // 입구 파일은 공통 청크 이름(esbuild 가 내용으로 지음)을 품으므로 입구 파일만 해시해도 청크 변경이 따라 잡힌다
+      vizBundles.set(id, crypto.createHash("sha1").update(fs.readFileSync(path.join(vizDst, id + ".js"))).digest("hex").slice(0, 8));
       console.log("  viz:", vf);
     }
   }
@@ -120,7 +159,7 @@ const exercisePaletteCss =
 const appCss = fs.readFileSync(path.join(SRC, "style.css"), "utf-8") + "\n" + paletteCss() + "\n" + exercisePaletteCss;
 
 // ── 대화: "**김민준 〔M04〕:** …" 문단을 말풍선 차례로 바꾼다 ──
-// 〔인덱스〕가 있는 차례에만 인물 표정 그림(images/cast/<인덱스>.webp)을 둔다. 파일이 없으면 빈 자리 표시.
+// 모든 차례에 인물 표정 그림(images/cast/<인덱스>.webp)을 둔다. 〔인덱스〕가 없으면 평상 표정(T01·M01·S01), 파일이 없으면 빈 자리 표시.
 // 표정 그림 원본은 교재 공용 폴더(~/lameproof/shared/characters/assets). 책 안에 사본을 두지 않고 빌드 때 dist 로 복사한다.
 const CAST_DIR = path.join(os.homedir(), "lameproof", "shared", "characters", "assets");
 if (fs.existsSync(CAST_DIR)) {
@@ -255,16 +294,32 @@ addEventListener('keydown', e => {
   if (a) location.href = a.href;
 });
 
-// Mermaid
-if (document.querySelector('pre.mermaid')) import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs').then(m => {
+// Mermaid — 테마를 바꾸면 원본 소스로 되돌려 다시 그린다
+const mermaidNodes = [...document.querySelectorAll('pre.mermaid')];
+mermaidNodes.forEach(n => { n.dataset.src = n.textContent; });
+let mermaidLib = null;
+async function renderMermaid() {
+  if (!mermaidNodes.length) return;
+  if (!mermaidLib) mermaidLib = (await import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs')).default;
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-  m.default.initialize({
-    startOnLoad: false,
-    theme: isDark ? 'dark' : 'default',
-    securityLevel: 'loose',
-  });
-  m.default.run();
-});
+  // 다크: mermaid 내장 dark 는 회색 상자·회색 묶음 바탕이 남색 페이지와 어긋난다 → 페이지 CSS 변수로 base 테마를 칠한다
+  const cs = getComputedStyle(document.documentElement), v = k => cs.getPropertyValue(k).trim();
+  mermaidLib.initialize(isDark ? {
+    startOnLoad: false, securityLevel: 'loose', theme: 'base',
+    themeVariables: {
+      darkMode: true, background: v('--bg'),
+      primaryColor: v('--bg-code'), primaryTextColor: v('--fg'), primaryBorderColor: v('--fg-muted'),
+      secondaryColor: v('--bg-code'), tertiaryColor: v('--bg-code'),
+      lineColor: v('--fg-muted'), textColor: v('--fg'),
+      clusterBkg: v('--bg'), clusterBorder: v('--fg-muted'),
+      edgeLabelBackground: v('--bg'), titleColor: v('--fg'),
+    },
+  } : { startOnLoad: false, theme: 'default', securityLevel: 'loose' });
+  mermaidNodes.forEach(n => { n.removeAttribute('data-processed'); n.textContent = n.dataset.src; });
+  await mermaidLib.run({ nodes: mermaidNodes });
+}
+renderMermaid();
+toggle.addEventListener('click', () => renderMermaid());
 </script>`;
 
 function buildPage({ pageTitle, sidebarActiveSlug, activeFile, bodyContent, vizScript }) {
@@ -338,7 +393,7 @@ function vizLoader(html) {
       var obs = new IntersectionObserver(function(entries) {
         if (entries[0].isIntersecting) {
           obs.disconnect();
-          import('./viz/${id}.js').then(function(m) { m.mount(el); });
+          import('./viz/${id}.js?v=${vizBundles.get(id)}').then(function(m) { m.mount(el); });
         }
       }, { rootMargin: '200px' });
       obs.observe(el);
